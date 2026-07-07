@@ -1,0 +1,336 @@
+---
+title: "Data Exploration"
+author: "Scott Forrest"
+date: "`r Sys.Date()`"
+execute: 
+  cache: false
+bibliography: paperpile.bib
+toc: true
+number-sections: false
+format: 
+  html:
+    self-contained: true
+    code-fold: show
+    code-tools: true
+    df-print: paged
+    code-line-numbers: true
+    code-overflow: scroll
+    fig-format: png
+    fig-dpi: 300
+  pdf:
+    fig-format: png
+    fig-dpi: 300
+    geometry: 
+      - top=30mm
+      - left=30mm
+editor:
+  source
+abstract: |
+  Looking into the movement data of feral pigs.
+---
+
+# Load packages
+
+```{r}
+#| label: packages
+#| code-summary: "Load packages"
+#| message: false
+#| warning: false
+
+library(tidyverse)
+packages <- c("amt", "lubridate",
+              "terra", "sf",
+              "beepr", "tictoc")
+walk(packages, require, character.only = T)
+
+```
+
+# Import GPS tracking data
+
+```{r}
+
+pig_all_steps <- read_csv("data/pig_all_steps_20260707.csv")
+
+# Convert timezone after import (resets to GMT)
+pig_all_steps <- pig_all_steps %>% 
+  mutate(
+    t1_  = with_tz(t1_, tzone = "Australia/Darwin"),
+    t2_ = with_tz(t2_, tzone = "Australia/Darwin"), 
+    hour = hour(t1_) + minute(t1_)/60 + second(t1_)/3600,
+    hour_round = hour(t1_),
+    month = month(t1_),
+    season = case_when(month %in% c(11,12, 1, 2, 3, 4) ~ "wet",
+                       month %in% seq(5,10) ~ "dry")
+    )
+
+```
+
+### Use the temperature to check the timezone 
+
+Assuming hotter during the middle hours.
+
+```{r}
+
+# by pig ID
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = temp, colour = name, fill = name)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "gam", se = T) +
+  scale_colour_viridis_d() +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  theme(legend.position = "none")
+
+# by the month of the year
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = temp, colour = as.factor(month), fill = as.factor(month))) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "gam", se = T) +
+  scale_colour_viridis_d("Month") +
+  scale_fill_viridis_d("Month") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+# by season
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = temp, colour = season, fill = season)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "gam", se = T) +
+  # scale_colour_viridis_d("Season") +
+  # scale_fill_viridis_d("Season") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+```
+
+### Step length and turning angle distributions
+
+```{r}
+
+pig_all_steps %>% 
+  filter(dt_hour < 0.75) %>% # keep the half-hour locations
+  ggplot(aes(x = sl_)) +
+  geom_histogram(fill = "orange", colour = "black", binwidth = 10) +
+  scale_x_continuous("Step length (m)", limits = c(0, 500)) +
+  theme_bw() 
+
+pig_all_steps %>% 
+  filter(dt_hour < 0.75) %>% # keep the half-hour locations
+  ggplot(aes(x = ta_)) +
+  geom_histogram(fill = "orange", colour = "black") +
+  theme_bw() 
+
+pig_all_steps %>% 
+  filter(dt_hour < 0.75) %>% # keep the half-hour locations
+  ggplot(aes(x = direction_p)) +
+  geom_histogram(fill = "orange", colour = "black") +
+  theme_bw() 
+
+```
+
+## Step lengths across the hours of the day
+
+::: {.panel-tabset}
+
+## Step length distributions
+
+```{r}
+
+pig_all_steps %>% filter(dt_hour < 0.75) %>% 
+  ggplot(aes(x = sl_, 
+             #fill = as.factor(hour_round), 
+             colour = as.factor(hour_round))) + 
+  geom_density(alpha = 0.2) +
+  scale_x_continuous("Step length (m)", limits = c(0, 500)) +
+  # scale_fill_viridis_d("Hour of the day") +
+  # scale_colour_viridis_d("Hour of the day") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+```
+
+## Log of step length distributions
+
+```{r}
+
+pig_all_steps %>% filter(dt_hour < 0.75) %>% 
+  ggplot(aes(x = sl_, 
+             #fill = as.factor(hour_round), 
+             colour = as.factor(hour_round))) + 
+  geom_density(alpha = 0.2) +
+  scale_x_log10("Step length (m)") +
+  # scale_fill_viridis_d("Hour of the day") +
+  # scale_colour_viridis_d("Hour of the day") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+```
+
+## Plotted across hours
+
+There does appear to be a temporal trend, with larger step lengths around dawn and dusk.
+
+```{r}
+
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = sl_)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "gam", se = T) +
+  scale_y_continuous("Step length (m)", limits = c(0, 500)) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+## By ID
+
+```{r}
+
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = sl_, colour = name, fill = name)) +
+  geom_point(alpha = 0.1) +
+  scale_colour_viridis_d() +
+  scale_fill_viridis_d() +
+  geom_smooth(method = "gam", se = T) +
+  scale_y_continuous("Step length (m)", limits = c(0, 500)) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+## By season
+
+```{r}
+
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = sl_, colour = season, fill = season)) +
+  geom_point(alpha = 0.1) +
+  # scale_colour_viridis_d() +
+  # scale_fill_viridis_d() +
+  geom_smooth(method = "gam", se = T) +
+  scale_y_continuous("Step length (m)", limits = c(0, 500)) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+
+## Gamma - all data
+
+```{r}
+
+sl_gamma <- fit_distr(pig_all_steps$sl_, "gamma", na.rm = TRUE)
+sl_gamma
+
+```
+
+## Gamma - discrete periods
+
+We will, fairly arbitrarily, split the day into 4 periods: dawn (4-8), day (8-16), dusk (16-20), night (20-4).
+
+Note that the hour_round is the floor (from lubridate::hour), i.e. 4:50am is 4, is it is within the 4th hour.
+
+```{r}
+
+pig_all_steps <- pig_all_steps %>% 
+  mutate(
+    day_period = case_when(hour_round %in% c(4,5,6,7) ~ "dawn",
+                       hour_round %in% seq(8,15) ~ "day",
+                       hour_round %in% seq(16,19) ~ "dusk",
+                       hour_round %in% c(20,21,22,23,0,1,2,3) ~ "night")
+  )
+
+sl_gamma_dawn <- fit_distr(pig_all_steps %>% filter(day_period == "dawn") %>% pull(sl_), "gamma", na.rm = TRUE)
+sl_gamma_dawn
+
+sl_gamma_day <- fit_distr(pig_all_steps %>% filter(day_period == "day") %>% pull(sl_), "gamma", na.rm = TRUE)
+sl_gamma_day
+
+sl_gamma_dusk <- fit_distr(pig_all_steps %>% filter(day_period == "dusk") %>% pull(sl_), "gamma", na.rm = TRUE)
+sl_gamma_dusk
+
+sl_gamma_night <- fit_distr(pig_all_steps %>% filter(day_period == "night") %>% pull(sl_), "gamma", na.rm = TRUE)
+sl_gamma_night
+
+```
+
+:::
+
+### Temp vs step lengths
+
+```{r}
+
+pig_all_steps %>% 
+  filter(dt_hour < 0.75) %>% # keep the half-hour locations
+  ggplot(aes(x = temp, y = sl_, colour = season, fill = season)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "gam", se = T) +
+  theme_bw() 
+
+```
+
+### Speed across the tracking period
+
+```{r}
+
+pig_all_steps %>%
+  filter(dt_hour < 0.75) %>% # keep the half-hour locations
+  ggplot(aes(x = t1_, y = sl_, colour = name, fill = name)) +
+  geom_point(alpha = 0.1) +
+  scale_colour_viridis_d() +
+  scale_fill_viridis_d() +
+  geom_smooth(method = "gam", se = T) +
+  theme_bw() +
+  theme(legend.position = "none")  
+
+```
+
+# Import shooting data
+
+```{r}
+
+# Import shapefile of shooting locations using sf
+shooting_locations <- st_read("mapping/pig_shooting_2026.shp")
+
+```
+
+## Plot the shooting locations
+
+```{r}
+
+ggplot() +
+  # geom_point(data = pig_all_steps, aes(x = x1_, y = y1_, colour = name), size = 0.1, alpha = 0.1) +
+  geom_sf(data = shooting_locations, colour = "red", size = 0.5) +
+  coord_sf() +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+# Import landcover data
+
+```{r}
+
+# Import shapefile of landcover data using sf
+# landcover <- st_read("mapping/VegTypes_CDU2025.shp")
+
+```
+
+```{r}
+
+# landcover[[1]][[1]]
+
+```
+
+# References
+
+::: {#refs}
+:::
+
+# Session Information
+
+```{r}
+
+utils::sessionInfo()
+
+```

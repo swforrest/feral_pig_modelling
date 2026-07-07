@@ -1,0 +1,298 @@
+---
+title: "Data Preparation"
+author: "Scott Forrest"
+date: "`r Sys.Date()`"
+execute: 
+  cache: false
+bibliography: paperpile.bib
+toc: true
+number-sections: false
+format: 
+  html:
+    # self-contained: true
+    code-fold: show
+    code-tools: true
+    df-print: paged
+    code-line-numbers: true
+    code-overflow: scroll
+    fig-format: png
+    fig-dpi: 300
+  pdf:
+    fig-format: png
+    fig-dpi: 300
+    geometry: 
+      - top=30mm
+      - left=30mm
+editor:
+  source
+abstract: |
+  Preparing feral pig GPS tracking data. 
+---
+
+# Load packages
+
+```{r}
+#| label: packages
+#| code-summary: "Load packages"
+#| message: false
+#| warning: false
+
+library(tidyverse)
+packages <- c("amt", "lubridate", 
+              "SDLfilter",
+              "terra", 
+              "beepr", "tictoc")
+walk(packages, require, character.only = T)
+
+```
+
+# Import GPS tracking data
+
+```{r}
+#| label: import_data
+#| code-summary: "Import GPS tracking data"
+#| message: false
+#| warning: false
+
+pig_gps <- read_csv("data/GPS_062226_131334.CSV")
+
+unique(pig_gps$`Device ID`)
+
+pig_gps %>% arrange(`Device Name`)
+
+```
+
+# Clean data
+
+## Order the data and rename columns
+
+```{r}
+
+name_map <- c(
+  "159094" = "Duane",
+  "159096" = "Chief",
+  "158997" = "Miss Piggy",
+  "159086" = "Half Pint",
+  "159088" = "Razorback",
+  "159089" = "Johns",
+  "159003" = "Knocknee",
+  "159087" = "King David",
+  "159083" = "Unknown1",
+  "159091" = "Collingwood",
+  "159085" = "The Big Mann",
+  "159095" = "Doris",
+  "152648" = "Spot",
+  "152641" = "Brook",
+  "159005" = "Puncture",
+  "152638" = "Betty",
+  "159010" = "Isaac",
+  "152643" = "Dora the Explorer",
+  "159007" = "Bond",
+  "152646" = "Unknown2",
+  "159497" = "Big Bertha",
+  "159489" = "Mr Stinky",
+  "159491" = "Darren",
+  "159493" = "Porky",
+  "159496" = "Calvin",
+  "159490" = "Rosie",
+  "111"    = "Man Named Sue",
+  "159495" = "Andrew",
+  "159492" = "Harry",
+  "159494" = "Olivia"
+)
+
+pig_gps <- pig_gps %>%  
+  group_by(`Device Name`) %>% 
+  arrange(`Date & Time [Local]`, .by_group = T) %>% 
+  distinct(.keep_all = T) %>%
+  mutate(id = `Device ID`,
+         name = name_map[as.character(`Device ID`)],
+         `Date & Time [Local]` = with_tz(`Date & Time [GMT]`, tzone = "Australia/Darwin"), # i think it's already in Darwin time
+         # `Date & Time [Local]` = force_tz(`Date & Time [GMT]`, tzone = "Australia/Darwin"),
+         time = `Date & Time [Local]`,
+         lon = `Longitude`,
+         lat = `Latitude`,
+         n_sat = as.integer(str_extract(`Fix Status`, "\\d+(?= SV)")),
+         temp = `Temp [C]`) %>% 
+  drop_na() %>%
+  ungroup() 
+
+```
+
+## Update names from metadata 
+
+```{r}
+
+pig_gps_cols <- pig_gps %>% dplyr::select(id, name, time, lon, lat, n_sat, temp) 
+# attr(pig_gps_cols$time, "tzone") <- "Australia/Darwin"
+tz(pig_gps_cols$time)
+
+# view the data
+head(pig_gps_cols)
+
+pig_gps_ids <- unique(pig_gps_cols$id)
+
+```
+
+# GPS data cleaning
+
+We'll do a basic speed filter from @Shimada2012-tm. But, for some reason the function isn't working, so we'll do it manually below.
+
+```{r}
+
+pig_gps_cols %>% group_by(id) %>% 
+  summarise(n = n(),
+            start_time = min(time),
+            end_time = max(time),
+            duration = as.numeric(difftime(end_time, start_time, units = "days")))
+
+# # add a qi column for the number of satellites, and drop any rows with NA values
+# pig_gps_cols <-  pig_gps_cols %>% 
+#   mutate(DateTime = time,
+#          qi = n_sat) %>% 
+#   drop_na()
+# 
+# 
+# pig_vmax <- SDLfilter::vmax(pig_gps_cols, qi = 5, method = "sample", prob = 0.99)
+
+```
+
+## Setup trajectory
+
+Use the `amt` package to create a trajectory object from the cleaned data. 
+
+```{r}
+#| label: make_track
+#| code-summary: "Create a trajectory object"
+
+pig_all <- pig_gps_cols %>% mk_track(id = id,
+                                           lon,
+                                           lat, 
+                                           time, 
+                                           all_cols = T,
+                                           crs = 4326) %>% 
+  transform_coords(crs_to = 3112, crs_from = 4326) # Transformation to GDA94 / 
+# Geoscience Australia Lambert (https://epsg.io/3112)
+
+pig_all <- pig_all %>% arrange(id, t_)
+
+# plot the data spatially coloured by ID
+pig_all %>%
+  ggplot(aes(x = x_, y = y_, colour = name)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  coord_fixed() +
+  scale_colour_viridis_d() +
+  theme_classic()
+
+# coloured by the number of satellites
+pig_all %>% 
+  ggplot(aes(x = x_, y = y_, colour = n_sat)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  coord_fixed() +
+  scale_colour_viridis_c(direction = 1) +
+  theme_classic()
+
+```
+
+## Creating a step object 
+
+```{r}
+
+# nest the data by individual
+pig_all_nested <- pig_all %>% arrange(id) %>% nest(data = -"id")
+
+pig_all_nested_steps <- pig_all_nested %>%
+  mutate(steps = map(data, function(x)
+    x %>% track_resample(rate = minutes(30), tolerance = minutes(65)) %>%
+      steps_by_burst(keep_cols = "start")))
+
+# unnest the data after creating 'steps' objects
+pig_all_steps <- pig_all_nested_steps %>% 
+  amt::select(id, steps) %>% 
+  amt::unnest(cols = steps) %>% 
+  relocate(c(name, n_sat), .before = id) %>% 
+  mutate(dt_min = as.numeric(difftime(t2_, t1_, units = "mins")),
+         dt_hour = as.numeric(difftime(t2_, t1_, units = "hours"))) %>% 
+  filter(dt_min > 20)
+
+hist(as.numeric(pig_all_steps$dt_min))
+
+```
+
+## Calculate the speed for fixes > 5 satellites
+
+```{r}
+
+hist(pig_all_steps$n_sat)
+hist(pig_all_steps$sl_)
+
+pig_all_steps <- pig_all_steps %>% mutate(
+  speed = sl_ / as.numeric(difftime(t2_, t1_, units = "hours")) / 1000
+) 
+
+# unrealistic step lengths with all satellites
+pig_all_steps %>% 
+  ggplot(aes(x = speed)) +
+  geom_histogram(bins = 50) +
+  theme_classic()
+
+pig_all_steps %>% filter(n_sat > 5) %>% 
+  ggplot(aes(x = speed)) +
+  geom_histogram(bins = 50) +
+  theme_classic()
+
+```
+
+```{r}
+
+vmax <- pig_all_steps %>% filter(n_sat > 5) %>% 
+  # group_by(id) %>%
+  summarise(speed_95 = quantile(speed, 0.95, na.rm = T),
+            speed_999 = quantile(speed, 0.999, na.rm = T)
+            )
+
+pig_all_steps <- pig_all_steps %>% 
+  mutate(less_vmax = speed < vmax$speed_999)
+
+pig_all_steps <- pig_all_steps %>% filter(less_vmax) %>% 
+  select(-less_vmax) %>% 
+  arrange(id, t1_)
+  
+```
+
+## Plot after filtering
+
+```{r}
+
+# plot the data spatially coloured by ID
+pig_all_steps %>%
+  ggplot(aes(x = x1_, y = y1_, colour = name)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  coord_fixed() +
+  scale_colour_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+```
+
+# Export dataframe without covariates
+
+```{r}
+
+# set the name to match the input data frame
+write_csv(pig_all_steps, "data/pig_all_steps_20260707.csv")
+
+```
+
+# References
+
+::: {#refs}
+:::
+
+# Session Information
+
+```{r}
+
+utils::sessionInfo()
+
+```
