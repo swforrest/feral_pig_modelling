@@ -40,7 +40,8 @@ abstract: |
 library(tidyverse)
 packages <- c("amt", "lubridate",
               "terra", "sf",
-              "beepr", "tictoc")
+              "beepr", "tictoc",
+              "leaflet")
 walk(packages, require, character.only = T)
 
 ```
@@ -62,6 +63,48 @@ pig_all_steps <- pig_all_steps %>%
     season = case_when(month %in% c(11,12, 1, 2, 3, 4) ~ "wet",
                        month %in% seq(5,10) ~ "dry")
     )
+
+```
+
+## Plot the pig data
+
+```{r}
+
+# plot the data spatially coloured by ID
+pig_all_steps %>%
+  ggplot(aes(x = x1_, y = y1_, colour = name)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  coord_fixed() +
+  scale_colour_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+```
+
+## Use leaflet to plot the data
+
+```{r}
+#| label: leaflet-map
+#| message: false
+#| warning: false
+
+# convert to an sf object (x1_/y1_ are in GDA94 / GA Lambert, EPSG:3112)
+# and reproject to WGS84 (EPSG:4326) for leaflet
+pig_all_steps_sf <- pig_all_steps %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>%
+  st_transform(crs = 4326)
+
+pal <- colorFactor(viridisLite::viridis(n_distinct(pig_all_steps_sf$name)),
+                    domain = pig_all_steps_sf$name)
+
+leaflet(pig_all_steps_sf) %>%
+  addProviderTiles(providers$Esri.WorldImagery) %>%
+  addCircleMarkers(radius = 2,
+                    stroke = FALSE,
+                    fillOpacity = 0.5,
+                    color = ~pal(name),
+                    popup = ~paste0("ID: ", name, "<br>Time: ", t1_)) %>%
+  addLegend(position = "bottomright", pal = pal, values = ~name, title = "Pig ID")
 
 ```
 
@@ -292,6 +335,9 @@ pig_all_steps %>%
 # Import shapefile of shooting locations using sf
 shooting_locations <- st_read("mapping/pig_shooting_2026.shp")
 
+# Import shapefile of shooting locations using terra
+# shooting_locations <- vect("mapping/pig_shooting_2026.shp")
+
 ```
 
 ## Plot the shooting locations
@@ -314,11 +360,13 @@ ggplot() +
 # Import shapefile of landcover data using sf
 # landcover <- st_read("mapping/VegTypes_CDU2025.shp")
 
+landcover <- vect("mapping/VegTypes_CDU2025.shp")
+
 ```
 
 ```{r}
 
-# landcover[[1]][[1]]
+# plot(landcover)
 
 ```
 
