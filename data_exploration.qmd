@@ -693,6 +693,7 @@ pig_all_steps_covs %>%
 ### Looping over all landcover variables
 
 ```{r}
+#| warning: false
 
 # only plot the landcover types that occur at least 1000 times in the data
 present_veg_vars <- names(landcover_dummy)[
@@ -703,6 +704,32 @@ for (veg_var in present_veg_vars) {
   p <- pig_all_steps_covs %>%
     filter(dt_hour < 0.75) %>% # keep the half-hour locations
     ggplot(aes(x = hour, y = .data[[veg_var]], colour = name, fill = name)) +
+    geom_point(alpha = 0.1) +
+    scale_colour_viridis_d() +
+    scale_fill_viridis_d() +
+    geom_smooth(method = "gam", se = T) +
+    labs(y = veg_var) +
+    theme_bw() +
+    theme(legend.position = "none")
+
+  print(p)
+
+}
+
+```
+
+```{r}
+#| warning: false
+
+# only plot the landcover types that occur at least 1000 times in the data
+present_veg_vars <- names(landcover_dummy)[
+  colSums(pig_all_steps_covs[names(landcover_dummy)], na.rm = TRUE) > 1000] 
+
+for (veg_var in present_veg_vars) {
+
+  p <- pig_all_steps_covs %>%
+    filter(dt_hour < 0.75) %>% # keep the half-hour locations
+    ggplot(aes(x = t1_, y = .data[[veg_var]], colour = name, fill = name)) +
     geom_point(alpha = 0.1) +
     scale_colour_viridis_d() +
     scale_fill_viridis_d() +
