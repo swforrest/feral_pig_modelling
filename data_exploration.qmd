@@ -97,16 +97,55 @@ pig_all_steps_sf <- pig_all_steps %>%
 pal <- colorFactor(viridisLite::viridis(n_distinct(pig_all_steps_sf$name)),
                     domain = pig_all_steps_sf$name)
 
-leaflet(pig_all_steps_sf) %>%
+# addCircleMarkers() draws one SVG element per point, and there are ~246k of
+# them, which locks up the browser (and the VS Code webview in particular).
+# Thin the points for display and draw them with WebGL via leafgl instead.
+pig_map_pts <- pig_all_steps_sf %>%
+  group_by(name) %>%
+  slice(seq(1, n(), by = 1)) %>% # every 10th fix per pig
+  ungroup()
+
+pig_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
   addProviderTiles(providers$Esri.WorldImagery) %>%
-  addCircleMarkers(radius = 2,
-                    stroke = FALSE,
-                    fillOpacity = 0.5,
-                    color = ~pal(name),
-                    popup = ~paste0("ID: ", name, "<br>Time: ", t1_)) %>%
-  addLegend(position = "bottomright", pal = pal, values = ~name, title = "Pig ID")
+  leafgl::addGlPoints(data = pig_map_pts,
+                      fillColor = pal(pig_map_pts$name),
+                      fillOpacity = 0.6,
+                      radius = 4,
+                      popup = paste0("ID: ", pig_map_pts$name,
+                                     "<br>Time: ", pig_map_pts$t1_)) %>%
+  addLegend(position = "bottomright", pal = pal,
+            values = pig_map_pts$name, title = "Pig ID")
+
+# The VS Code htmlwidget viewer struggles with large maps, so when working
+# interactively write the map out and open it in the system browser. When the
+# document is rendered, the widget is printed inline as usual.
+if (interactive()) {
+  map_file <- file.path(tempdir(), "pig_map.html")
+  # selfcontained = FALSE writes a sibling _files/ folder, which avoids needing
+  # pandoc on the path and is much faster to write for a map this size
+  htmlwidgets::saveWidget(pig_map, map_file, selfcontained = FALSE)
+  utils::browseURL(map_file)
+} else {
+  pig_map
+}
 
 ```
+
+## Create a bounding box around the pig data to crop the other layers by
+
+```{r}
+
+pig_all_steps_sf
+
+pig_aoi <- st_bbox(pig_all_steps_sf) %>% 
+  st_as_sfc() %>% 
+  st_transform(crs = 3112) %>% 
+  st_buffer(dist = 2500) %>%
+  st_bbox() %>% # the buffer creates curved corners so we need to get the bounding box of the buffered area
+  st_as_sfc()
+
+```
+
 
 ### Use the temperature to check the timezone 
 
@@ -283,17 +322,18 @@ pig_all_steps <- pig_all_steps %>%
                        hour_round %in% c(20,21,22,23,0,1,2,3) ~ "night")
   )
 
-sl_gamma_dawn <- fit_distr(pig_all_steps %>% filter(day_period == "dawn") %>% pull(sl_), "gamma", na.rm = TRUE)
-sl_gamma_dawn
-
-sl_gamma_day <- fit_distr(pig_all_steps %>% filter(day_period == "day") %>% pull(sl_), "gamma", na.rm = TRUE)
-sl_gamma_day
-
-sl_gamma_dusk <- fit_distr(pig_all_steps %>% filter(day_period == "dusk") %>% pull(sl_), "gamma", na.rm = TRUE)
-sl_gamma_dusk
-
-sl_gamma_night <- fit_distr(pig_all_steps %>% filter(day_period == "night") %>% pull(sl_), "gamma", na.rm = TRUE)
-sl_gamma_night
+# For Andrew
+# sl_gamma_dawn <- fit_distr(pig_all_steps %>% filter(day_period == "dawn") %>% pull(sl_), "gamma", na.rm = TRUE)
+# sl_gamma_dawn
+# 
+# sl_gamma_day <- fit_distr(pig_all_steps %>% filter(day_period == "day") %>% pull(sl_), "gamma", na.rm = TRUE)
+# sl_gamma_day
+# 
+# sl_gamma_dusk <- fit_distr(pig_all_steps %>% filter(day_period == "dusk") %>% pull(sl_), "gamma", na.rm = TRUE)
+# sl_gamma_dusk
+# 
+# sl_gamma_night <- fit_distr(pig_all_steps %>% filter(day_period == "night") %>% pull(sl_), "gamma", na.rm = TRUE)
+# sl_gamma_night
 
 ```
 
@@ -335,6 +375,8 @@ pig_all_steps %>%
 # Import shapefile of shooting locations using sf
 shooting_locations <- st_read("mapping/pig_shooting_2026.shp")
 
+st_crs(shooting_locations)
+
 # Import shapefile of shooting locations using terra
 # shooting_locations <- vect("mapping/pig_shooting_2026.shp")
 
@@ -345,7 +387,7 @@ shooting_locations <- st_read("mapping/pig_shooting_2026.shp")
 ```{r}
 
 ggplot() +
-  # geom_point(data = pig_all_steps, aes(x = x1_, y = y1_, colour = name), size = 0.1, alpha = 0.1) +
+  geom_sf(data = pig_all_steps_sf, aes(colour = name), size = 0.1, alpha = 0.1) +
   geom_sf(data = shooting_locations, colour = "red", size = 0.5) +
   coord_sf() +
   theme_bw() +
@@ -353,22 +395,386 @@ ggplot() +
 
 ```
 
-# Import landcover data
+### Crop the shooting locations
+
+```{r}
+
+filtered_shooting_locations <- shooting_locations %>% 
+  st_transform(crs = 3112) %>% 
+  st_crop(pig_aoi)
+
+ggplot() +
+  geom_sf(data = pig_all_steps_sf, aes(colour = name), size = 0.1, alpha = 0.1) +
+  geom_sf(data = filtered_shooting_locations, colour = "red", size = 0.5) +
+  coord_sf() +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+
+# Import environmental data
+
+## Sentinel-2 data
+
+```{r}
+
+s2 <- rast("mapping/feral_pig_aoi_S2_median_full_2025-09-12_to_2026-06-23.tif")
+plot(s2)
+
+```
+
+## NDVI, NDWI and NDMI data
+
+```{r}
+
+s2_indices <- rast("mapping/feral_pig_aoi_S2_indices_2025-09-12_to_2026-06-23.tif")
+plot(s2_indices)
+
+ndvi <- s2_indices$NDVI / 10000
+ndwi <- s2_indices$NDWI / 10000
+ndmi <- s2_indices$NDMI / 10000
+
+plot(ndvi)
+plot(ndwi)
+plot(ndmi)
+
+```
+
+## AlphaEarth embeddings
+
+```{r}
+
+# alpha_earth_1 <- rast("mapping/feral_pig_aoi_alphaearth_2025-0000000000-0000000000.tif")
+# plot(alpha_earth_1)
+# alpha_earth_2 <- rast("mapping/feral_pig_aoi_alphaearth_2025-0000000000-0000003072.tif")
+# plot(alpha_earth_2)
+
+```
+
+## Landcover data
 
 ```{r}
 
 # Import shapefile of landcover data using sf
-# landcover <- st_read("mapping/VegTypes_CDU2025.shp")
+landcover <- st_read("mapping/VegTypes_CDU2025.shp")
+landcover
 
-landcover <- vect("mapping/VegTypes_CDU2025.shp")
+# Import shapefile of landcover data using terra
+# landcover <- vect("mapping/VegTypes_CDU2025.shp")
 
 ```
+
+### Crop the landcover data
 
 ```{r}
 
-# plot(landcover)
+landcover_cropped <- landcover %>% 
+  st_transform(crs = 3112) %>% 
+  st_crop(pig_aoi)
 
 ```
+
+### Plot the landcover data
+
+```{r}
+
+ggplot() +
+  geom_sf(data = landcover_cropped, aes(fill = Veg_class), colour = NA) +
+  geom_sf(data = pig_all_steps_sf, aes(colour = name), size = 0.1, alpha = 0.1) +
+  coord_sf() +
+  scale_colour_viridis_d() +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+### How many landcover types are there?
+
+```{r}
+
+unique(landcover_cropped$Veg_class)
+length(unique(landcover_cropped$Veg_class))
+
+```
+
+### Create landcover raster layers for each landcover type
+
+One binary (0/1) layer per vegetation class, on the same grid as the Sentinel-2
+exports so that all of the covariates stack without any resampling.
+
+```{r}
+#| label: landcover-dummy
+
+# Use the ndvi layer as the template grid (20 m, EPSG:3112) so the
+# landcover layers line up cell-for-cell with the remotely sensed covariates
+lc_template <- deepcopy(ndvi)
+lc_template[] <- NA # keep the geometry, drop the values
+
+# Rasterise the polygons; a character field gives a categorical raster, where
+# the levels table maps the integer cell values back to the class names
+landcover_rast <- rasterize(vect(landcover_cropped), lc_template,
+                            field = "Veg_class")
+plot(landcover_rast)
+lc_levels <- levels(landcover_rast)[[1]]
+
+```
+
+### What frequency do they occur in the data?
+
+```{r}
+
+landcover_vals <- terra::extract(landcover_rast, matrix(c(pig_all_steps$x2_, pig_all_steps$y2_), ncol = 2))
+pig_all_steps_covs <- bind_cols(pig_all_steps, landcover_vals) 
+
+pig_all_steps_covs %>% 
+  ggplot() +
+  geom_bar(aes(y = Veg_class, fill = Veg_class)) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+### Recode based on their frequency in the data
+
+```{r}
+
+recode_df <- data.frame(
+  
+  old = c("Wet Rainforest Springfed", 
+          "Water", 
+          "Mudflat",
+          "Melaleuca Woodland", 
+          "Melaleuca Open Woodland",
+          "Melaleuca Open Forest", 
+          "Melaleuca Closed Forest",
+          "Mangrove", 
+          "Grassland",
+          "Floodplain Sedgeland",
+          "Eucalypt Woodland", 
+          "Eucalypt Open Woodland",
+          "Eucalypt Open Forest", 
+          "Eucalypt Closed Forest",
+          "Dry Rainforest"),
+  
+  new = c("Dry Rainforest", 
+          "Water", 
+          "Mudflat",
+          "Melaleuca Woodland", 
+          "Melaleuca Woodland",
+          "Melaleuca Open Forest", 
+          "Melaleuca Closed Forest",
+          "Mangrove", 
+          "Floodplain Sedgeland",
+          "Floodplain Sedgeland",
+          "Eucalypt Woodland", 
+          "Eucalypt Woodland",
+          "Eucalypt Open Forest", 
+          "Eucalypt Open Forest",
+          "Dry Rainforest")
+)
+
+```
+
+### Apply recode to raster
+
+```{r}
+
+lvls <- levels(landcover_rast)[[1]]                 # data.frame: ID, Veg_class
+
+# left join: recode_df only covers classes seen at pig locations, but the
+# raster covers the whole study area, so classes absent from recode_df$old
+# would otherwise be dropped (and turn into NA) rather than passed through
+lvls <- merge(lvls, recode_df, by.x = "Veg_class", by.y = "old",
+              all.x = TRUE, sort = FALSE)
+
+lvls$new[is.na(lvls$new)] <- lvls$Veg_class[is.na(lvls$new)]
+
+landcover_rast_merged <- deepcopy(landcover_rast)
+levels(landcover_rast_merged) <- data.frame(ID = lvls$ID, Veg_class = lvls$new)
+landcover_rast_merged <- droplevels(landcover_rast_merged)  # collapses duplicate labels into shared levels
+
+freq(landcover_rast_merged)   # check the merge worked as expected
+plot(landcover_rast_merged)
+
+```
+
+### Create dummy variables for each landcover type
+
+```{r}
+
+# segregate() expands the categorical raster into one 0/1 layer per class
+landcover_dummy <- segregate(landcover_rast_merged, other = 0)
+
+# segregate() names the layers by the integer category ID, so map them back to
+# the class names, as snake_case so they work as covariate names downstream
+names(landcover_dummy) <- lc_levels$Veg_class[
+  match(as.integer(names(landcover_dummy)), lc_levels$ID)] %>%
+  str_to_lower() %>%
+  str_replace_all("[^a-z0-9]+", "_") %>%
+  paste0("veg_", .)
+
+landcover_dummy
+
+# maxnl defaults to 16, so set it explicitly or the last few classes are dropped
+plot(landcover_dummy, col = c("grey90", "darkgreen"), legend = FALSE,
+     maxnl = nlyr(landcover_dummy), axes = FALSE,
+     mar = c(1.5, 1.5, 2, 1.5))
+
+```
+
+### Write the landcover variables to file
+
+```{r}
+
+# write out as a single multi-layer GeoTIFF; INT1U + DEFLATE keeps it small
+writeRaster(landcover_dummy, "mapping/landcover_dummy_20m.tif",
+            overwrite = TRUE,
+            datatype = "INT1U",
+            gdal = c("COMPRESS=DEFLATE", "PREDICTOR=2"))
+
+```
+
+# Extract landcover values at the pig locations
+
+```{r}
+
+covariate_vals <- terra::extract(
+  c(ndvi,
+    ndwi,
+    ndmi,
+    landcover_rast_merged,
+    landcover_dummy), 
+  matrix(c(pig_all_steps$x2_, pig_all_steps$y2_), ncol = 2))
+  
+pig_all_steps_covs <- bind_cols(pig_all_steps, covariate_vals) 
+
+# write to file
+write_csv(pig_all_steps_covs, "data/pig_all_steps_covs_20260813.csv")
+
+pig_all_steps_covs
+
+```
+
+### Check landcover frequency in the data after recoding
+
+```{r}
+
+pig_all_steps_covs %>% 
+  ggplot() +
+  geom_bar(aes(y = Veg_class, fill = Veg_class)) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+# Assess selection of covariates through time
+
+::: {.panel-tabset}
+
+## Landcover variables
+
+### Hourly
+
+```{r}
+
+pig_all_steps_covs %>%
+  filter(dt_hour < 0.75) %>% # keep the half-hour locations
+  ggplot(aes(x = hour, y = veg_floodplain_sedgeland, colour = name, fill = name)) +
+  geom_point(alpha = 0.1) +
+  scale_colour_viridis_d() +
+  scale_fill_viridis_d() +
+  geom_smooth(method = "gam", se = T) +
+  theme_bw() +
+  theme(legend.position = "none")  
+
+```
+
+### Looping over all landcover variables
+
+```{r}
+
+# only plot the landcover types that occur at least 1000 times in the data
+present_veg_vars <- names(landcover_dummy)[
+  colSums(pig_all_steps_covs[names(landcover_dummy)], na.rm = TRUE) > 1000] 
+
+for (veg_var in present_veg_vars) {
+
+  p <- pig_all_steps_covs %>%
+    filter(dt_hour < 0.75) %>% # keep the half-hour locations
+    ggplot(aes(x = hour, y = .data[[veg_var]], colour = name, fill = name)) +
+    geom_point(alpha = 0.1) +
+    scale_colour_viridis_d() +
+    scale_fill_viridis_d() +
+    geom_smooth(method = "gam", se = T) +
+    labs(y = veg_var) +
+    theme_bw() +
+    theme(legend.position = "none")
+
+  print(p)
+
+}
+
+```
+
+### Across the full tracking period
+
+```{r}
+
+pig_all_steps_covs %>%
+  filter(dt_hour < 0.75) %>% # keep the half-hour locations
+  ggplot(aes(x = t1_, y = veg_floodplain_sedgeland, colour = name, fill = name)) +
+  geom_point(alpha = 0.1) +
+  scale_colour_viridis_d() +
+  scale_fill_viridis_d() +
+  geom_smooth(method = "gam", se = T) +
+  theme_bw() +
+  theme(legend.position = "none")  
+
+```
+
+## NDVI
+
+### Hourly 
+
+```{r}
+
+pig_all_steps_covs %>%
+  filter(dt_hour < 0.75) %>% # keep the half-hour locations
+  ggplot(aes(x = hour, y = NDVI, colour = name, fill = name)) +
+  geom_point(alpha = 0.1) +
+  scale_colour_viridis_d() +
+  scale_fill_viridis_d() +
+  scale_y_continuous(limits = c(0, 1)) +
+  geom_smooth(method = "gam", se = T) +
+  theme_bw() +
+  theme(legend.position = "none")  
+
+```
+
+### Across the full tracking period
+
+```{r}
+
+pig_all_steps_covs %>%
+  filter(dt_hour < 0.75) %>% # keep the half-hour locations
+  ggplot(aes(x = t1_, y = NDVI, colour = name, fill = name)) +
+  geom_point(alpha = 0.1) +
+  scale_colour_viridis_d() +
+  scale_fill_viridis_d() +
+  scale_y_continuous(limits = c(0, 1)) +
+  geom_smooth(method = "gam", se = T) +
+  theme_bw() +
+  theme(legend.position = "right")  
+
+```
+
+## Landcover variables
+
+
+
+
+:::
 
 # References
 
