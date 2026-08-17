@@ -420,7 +420,7 @@ ggplot() +
 ```{r}
 
 s2 <- rast("mapping/feral_pig_aoi_S2_median_full_2025-09-12_to_2026-06-23.tif")
-plot(s2)
+# plot(s2)
 
 ```
 
@@ -449,6 +449,8 @@ plot(ndmi)
 # plot(alpha_earth_1)
 # alpha_earth_2 <- rast("mapping/feral_pig_aoi_alphaearth_2025-0000000000-0000003072.tif")
 # plot(alpha_earth_2)
+
+
 
 ```
 
@@ -652,8 +654,6 @@ pig_all_steps_covs <- bind_cols(pig_all_steps, covariate_vals)
 # write to file
 write_csv(pig_all_steps_covs, "data/pig_all_steps_covs_20260813.csv")
 
-pig_all_steps_covs
-
 ```
 
 ### Check landcover frequency in the data after recoding
@@ -796,9 +796,93 @@ pig_all_steps_covs %>%
 
 ```
 
-## Landcover variables
+# Subset tracking and environmental data
 
+Given there are two clusters in the data, subset to the one that has most of the data, greatly reducing the total area needed for the spatial layers. This is particularly helpful for the AlphaEarth embeddings, which are ~4GB for the full extent.
 
+## Subset tracking data
+
+### Plot all of the data
+
+```{r}
+
+paste0("There are ", nrow(pig_all_steps_covs), " pig locations in the data.")
+
+# plot the data spatially coloured by ID
+pig_all_steps_covs %>%
+  ggplot(aes(x = x1_, y = y1_, colour = name)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  coord_fixed() +
+  scale_colour_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+```
+
+### Plot with subset
+
+```{r}
+
+paste0("There are ", nrow(pig_all_steps_covs %>% filter(x1_ > -170000)), " pig locations in the subset.")
+
+  pig_all_steps_covs %>% 
+    filter(x1_ > -170000) %>%
+    ggplot(aes(x = x1_, y = y1_, colour = name)) +
+    geom_point(alpha = 0.5, size = 1) + 
+    coord_fixed() +
+    scale_colour_viridis_d() +
+    theme_classic() +
+    theme(legend.position = "none")
+  
+pig_all_steps_covs_subset <- pig_all_steps_covs %>% filter(x1_ > -170000)
+write_csv(pig_all_steps_covs_subset, "data/pig_all_steps_covs_subset_20260813.csv")
+
+```
+
+### Create bounding box
+
+```{r}
+
+pig_all_steps_covs_subset_sf <- pig_all_steps_covs_subset %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112)
+
+pig_subset_aoi <- st_bbox(pig_all_steps_covs_subset_sf) %>% 
+  st_as_sfc() %>% 
+  st_buffer(dist = 2500) %>%
+  st_bbox() %>% # the buffer creates curved corners so we need to get the bounding box of the buffered area
+  st_as_sfc()
+
+# plot the data with the bounding box
+ggplot() +
+  geom_sf(data = pig_subset_aoi) +
+  geom_point(data = pig_all_steps_covs,
+             aes(x = x1_, y = y1_, colour = name),
+             alpha = 0.5, size = 1) +
+  coord_sf() +
+  scale_colour_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+```
+
+## Subset environmental covariates
+
+### AlphaEarth embeddings
+
+```{r}
+
+# load and plot
+alphaearth_embeddings <- rast("mapping/feral_pig_aoi_alphaearth_2025.tif")
+plot(alphaearth_embeddings)
+
+# crop by the bounding box
+alphaearth_embeddings_crop <- crop(alphaearth_embeddings, pig_subset_aoi)
+plot(alphaearth_embeddings_crop)
+
+# save the cropped embeddings
+writeRaster(alphaearth_embeddings_crop, "mapping/feral_pig_aoi_alphaearth_2025_crop.tif", overwrite = TRUE)
+
+```
 
 
 :::
