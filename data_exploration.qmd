@@ -144,6 +144,11 @@ pig_aoi <- st_bbox(pig_all_steps_sf) %>%
   st_bbox() %>% # the buffer creates curved corners so we need to get the bounding box of the buffered area
   st_as_sfc()
 
+# save the bounding box as a shapefile
+pig_aoi %>% 
+  st_transform(crs = 4326) %>%
+  st_write("mapping/pig_aoi_wgs84.geojson", driver = "GeoJSON", delete_dsn = TRUE)
+
 ```
 
 
@@ -410,6 +415,8 @@ ggplot() +
   theme_bw() +
   theme(legend.position = "none")
 
+max(shooting_locations$Date)
+
 ```
 
 
@@ -450,7 +457,33 @@ plot(ndmi)
 # alpha_earth_2 <- rast("mapping/feral_pig_aoi_alphaearth_2025-0000000000-0000003072.tif")
 # plot(alpha_earth_2)
 
+```
 
+## Elevation data
+
+```{r}
+
+elevation <- rast("mapping/DEM.tif")
+plot(elevation)
+
+elevation_proj <- terra::project(elevation, "EPSG:3112")
+
+# align with the S2 indices
+elevation_aligned <- terra::resample(elevation_proj, s2_indices, method = "bilinear")
+plot(elevation_aligned)
+
+writeRaster(elevation_aligned, "mapping/DEM_3112.tif", overwrite = TRUE)
+
+```
+
+## Slope
+
+```{r}
+
+slope <- terrain(elevation_aligned, "slope", unit = "degrees")
+plot(slope)
+
+writeRaster(slope, "mapping/slope_3112.tif", overwrite = TRUE)
 
 ```
 
@@ -863,6 +896,11 @@ ggplot() +
   theme_classic() +
   theme(legend.position = "none")
 
+# save the bounding box as a shapefile
+pig_subset_aoi %>% 
+  st_transform(crs = 4326) %>%
+  st_write("mapping/pig_subset_aoi_wgs84.geojson", driver = "GeoJSON", delete_dsn = TRUE)
+
 ```
 
 ## Subset environmental covariates
@@ -884,6 +922,30 @@ writeRaster(alphaearth_embeddings_crop, "mapping/feral_pig_aoi_alphaearth_2025_c
 
 ```
 
+### DEM
+
+```{r}
+
+# crop by the bounding box
+elevation_aligned_crop <- crop(elevation_aligned, pig_subset_aoi)
+plot(elevation_aligned_crop)
+
+# save the cropped embeddings
+writeRaster(elevation_aligned_crop, "mapping/DEM_3112_crop.tif", overwrite = TRUE)
+
+```
+
+### Slope
+
+```{r}
+
+# crop by the bounding box
+slope_crop <- crop(slope, pig_subset_aoi)
+plot(slope_crop)
+
+writeRaster(slope_crop, "mapping/slope_3112_crop.tif", overwrite = TRUE)
+
+```
 
 :::
 
