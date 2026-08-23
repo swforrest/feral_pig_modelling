@@ -3,6 +3,8 @@ data/
 mapping/
 outputs/
 *.pdf
+*.pptx
+andrew_20260822/
 
 # History files
 .Rhistory

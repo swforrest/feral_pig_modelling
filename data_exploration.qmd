@@ -291,13 +291,14 @@ pig_all_steps %>%
 
 pig_all_steps %>% 
   ggplot(aes(x = hour, y = sl_, colour = season, fill = season)) +
-  geom_point(alpha = 0.1) +
+  geom_jitter(alpha = 0.1) +
   # scale_colour_viridis_d() +
   # scale_fill_viridis_d() +
   geom_smooth(method = "gam", se = T) +
-  scale_y_continuous("Step length (m)", limits = c(0, 500)) +
+  coord_cartesian(ylim = c(0, 150)) +
+  scale_y_continuous("Step length (m)") +
   theme_bw() +
-  theme(legend.position = "none")
+  theme(legend.position = "right")
 
 ```
 
@@ -658,6 +659,20 @@ plot(landcover_dummy, col = c("grey90", "darkgreen"), legend = FALSE,
 
 ```
 
+### Pull out water (with the NAs)
+
+```{r}
+
+plot(landcover_dummy[["veg_water"]])
+plot(is.na(landcover_dummy[["veg_water"]]))
+
+water_layer <- terra::subst(landcover_dummy[["veg_water"]], NA, 1)
+plot(water_layer)
+
+terra::writeRaster(water_layer, "mapping/water_layer_kakadu.tif", overwrite = TRUE)
+
+```
+
 ### Write the landcover variables to file
 
 ```{r}
@@ -856,8 +871,6 @@ pig_all_steps_covs %>%
 
 ```{r}
 
-paste0("There are ", nrow(pig_all_steps_covs %>% filter(x1_ > -170000)), " pig locations in the subset.")
-
   pig_all_steps_covs %>% 
     filter(x1_ > -170000) %>%
     ggplot(aes(x = x1_, y = y1_, colour = name)) +
@@ -868,6 +881,9 @@ paste0("There are ", nrow(pig_all_steps_covs %>% filter(x1_ > -170000)), " pig l
     theme(legend.position = "none")
   
 pig_all_steps_covs_subset <- pig_all_steps_covs %>% filter(x1_ > -170000)
+
+paste0("There are ", nrow(pig_all_steps_covs_subset), " pig locations from ", length(unique(pig_all_steps_covs_subset$name)), " individuals in the subset.")
+
 write_csv(pig_all_steps_covs_subset, "data/pig_all_steps_covs_subset_20260813.csv")
 
 ```
@@ -948,6 +964,38 @@ writeRaster(slope_crop, "mapping/slope_3112_crop.tif", overwrite = TRUE)
 ```
 
 :::
+
+# Prediction outputs
+
+## Create slightly smaller buffer for the simulation edge effects
+
+```{r}
+
+pig_subset_2250_aoi <- st_bbox(pig_all_steps_covs_subset_sf) %>% 
+  st_as_sfc() %>% 
+  st_buffer(dist = 2250) %>%
+  st_bbox() %>% # the buffer creates curved corners so we need to get the bounding box of the buffered area
+  st_as_sfc()
+
+```
+
+
+## Number of simulated locations per cell
+
+```{r}
+
+simulated_locations <- rast("outputs/alphaearth/2026-08-17_4/simulated_heatmap_599traj_20m_burnin0.tif")
+plot(simulated_locations)
+
+simulated_locations_crop <- terra::crop(simulated_locations, pig_subset_2250_aoi)
+water_layer_crop <- terra::crop(water_layer, pig_subset_2250_aoi)
+
+simulated_locations_crop_mask <- terra::mask(simulated_locations_crop, water_layer_crop, maskvalue = 1) 
+
+writeRaster(simulated_locations_crop_mask, "mapping/simulated_heatmap_599traj_20m_burnin0_crop_masked.tif", overwrite = TRUE)
+
+```
+
 
 # References
 
