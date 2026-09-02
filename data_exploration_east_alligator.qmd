@@ -41,7 +41,7 @@ library(tidyverse)
 packages <- c("amt", "lubridate",
               "terra", "sf",
               "beepr", "tictoc",
-              "leaflet")
+              "leaflet", "tidyterra")
 walk(packages, require, character.only = T)
 
 ```
@@ -1022,7 +1022,9 @@ ggsave("outputs/east_alligator_daily_veg_eucalypt_open_forest.png",
 
 ```
 
-### Dry rainforest
+## Dry rainforest
+
+### Hourly
 
 ```{r}
 
@@ -1077,6 +1079,8 @@ ggsave("outputs/east_alligator_daily_veg_dry_rainforest.png",
 
 ```
 
+:::
+
 ### Looping over all landcover variables
 
 ```{r}
@@ -1104,6 +1108,8 @@ for (veg_var in present_veg_vars) {
 }
 
 ```
+
+
 
 ```{r}
 #| warning: false
@@ -1210,7 +1216,7 @@ pig_all_steps_covs %>%
 
 ```{r}
 
-pig_all_steps_covs_subset_sf <- pig_all_steps_covs_subset %>%
+pig_all_steps_covs_subset_sf <- pig_all_steps_covs %>%
   st_as_sf(coords = c("x1_", "y1_"), crs = 3112)
 
 pig_subset_aoi <- st_bbox(pig_all_steps_covs_subset_sf) %>% 
@@ -1281,8 +1287,6 @@ writeRaster(slope_crop, "mapping/slope_3112_crop.tif", overwrite = TRUE)
 
 ```
 
-:::
-
 # Prediction outputs
 
 ## Create slightly smaller buffer for the simulation edge effects
@@ -1297,8 +1301,11 @@ pig_subset_2250_aoi <- st_bbox(pig_all_steps_covs_subset_sf) %>%
 
 ```
 
+# Number of simulated locations per cell
 
-## Number of simulated locations per cell
+::: {.panel-tabset}
+
+## All locations - no aggregation (20 metre cells)
 
 ```{r}
 
@@ -1311,6 +1318,158 @@ water_layer_crop <- terra::crop(water_layer, pig_subset_2250_aoi)
 simulated_locations_crop_mask <- terra::mask(simulated_locations_crop, water_layer_crop, maskvalue = 1) 
 
 writeRaster(simulated_locations_crop_mask, "mapping/simulated_heatmap_599traj_20m_burnin0_crop_masked.tif", overwrite = TRUE)
+
+```
+
+## All locations - 2x2 aggregation (40 metre cells)
+
+```{r}
+
+simulation_filename <- "simulated_heatmap_599traj_40m_burnin0_full.tif"
+simulated_locations <- rast(paste0("outputs/alphaearth/2026-08-17_4/", simulation_filename))
+plot(simulated_locations)
+
+simulated_locations_crop <- terra::crop(simulated_locations, pig_subset_2250_aoi)
+water_layer_crop <- terra::crop(water_layer, pig_subset_2250_aoi)
+
+# Resample water_layer onto the same grid as simulated_locations
+water_layer_resampled <- terra::resample(water_layer_crop, simulated_locations_crop, method = "near")
+# Now mask
+simulated_locations_crop_mask <- terra::mask(simulated_locations_crop, water_layer_resampled, maskvalue = 1)
+
+plot(simulated_locations_crop_mask)
+plot(log(simulated_locations_crop_mask))
+
+writeRaster(simulated_locations_crop_mask, paste0("mapping/", simulation_filename, "_crop_masked.tif"), overwrite = TRUE)
+writeRaster(log(simulated_locations_crop_mask), paste0("mapping/", simulation_filename, "_crop_masked_log.tif"), overwrite = TRUE)
+
+simulated_locations_full <- simulated_locations_crop_mask
+
+```
+
+## Dry season locations - 2x2 aggregation (40 metre cells)
+
+```{r}
+
+simulation_filename <- "simulated_heatmap_599traj_40m_burnin0_dry.tif"
+simulated_locations <- rast(paste0("outputs/alphaearth/2026-08-17_4/", simulation_filename))
+plot(simulated_locations)
+
+simulated_locations_crop <- terra::crop(simulated_locations, pig_subset_2250_aoi)
+water_layer_crop <- terra::crop(water_layer, pig_subset_2250_aoi)
+
+# Resample water_layer onto the same grid as simulated_locations
+water_layer_resampled <- terra::resample(water_layer_crop, simulated_locations_crop, method = "near")
+# Now mask
+simulated_locations_crop_mask <- terra::mask(simulated_locations_crop, water_layer_resampled, maskvalue = 1)
+
+plot(simulated_locations_crop_mask)
+plot(log(simulated_locations_crop_mask))
+
+writeRaster(simulated_locations_crop_mask, paste0("mapping/", simulation_filename, "_crop_masked.tif"), overwrite = TRUE)
+writeRaster(log(simulated_locations_crop_mask), paste0("mapping/", simulation_filename, "_crop_masked_log.tif"), overwrite = TRUE)
+
+simulated_locations_dry <- simulated_locations_crop_mask
+
+```
+
+## Wet season locations - 2x2 aggregation (40 metre cells)
+
+```{r}
+
+simulation_filename <- "simulated_heatmap_599traj_40m_burnin0_wet.tif"
+simulated_locations <- rast(paste0("outputs/alphaearth/2026-08-17_4/", simulation_filename))
+plot(simulated_locations)
+
+simulated_locations_crop <- terra::crop(simulated_locations, pig_subset_2250_aoi)
+water_layer_crop <- terra::crop(water_layer, pig_subset_2250_aoi)
+
+# Resample water_layer onto the same grid as simulated_locations
+water_layer_resampled <- terra::resample(water_layer_crop, simulated_locations_crop, method = "near")
+# Now mask
+simulated_locations_crop_mask <- terra::mask(simulated_locations_crop, water_layer_resampled, maskvalue = 1)
+
+plot(simulated_locations_crop_mask)
+plot(log(simulated_locations_crop_mask))
+
+writeRaster(simulated_locations_crop_mask, paste0("mapping/", simulation_filename, "_crop_masked.tif"), overwrite = TRUE)
+writeRaster(log(simulated_locations_crop_mask), paste0("mapping/", simulation_filename, "_crop_masked_log.tif"), overwrite = TRUE)
+
+simulated_locations_wet <- simulated_locations_crop_mask
+
+```
+
+## Difference between the wet and dry heatmaps
+
+```{r}
+
+heatmap_diff <- log(simulated_locations_wet) - log(simulated_locations_dry)
+
+# write the raster
+# writeRaster(heatmap_diff, "mapping/east_alligator_wet_dry_heatmap_diff.tif", overwrite = TRUE)
+
+# Find the max absolute value so the scale is symmetric around 0
+max_abs <- max(abs(minmax(heatmap_diff)), na.rm = TRUE)
+
+# Build a diverging palette: orange -> white -> skyblue
+n_cols <- 100
+pal <- colorRampPalette(c("orange", "white", "skyblue"))(n_cols)
+
+# Symmetric breaks so white always lands exactly on zero
+breaks <- seq(-max_abs, max_abs, length.out = n_cols + 1)
+
+plot(heatmap_diff, col = pal, breaks = breaks,
+     range = c(-max_abs, max_abs))
+
+```
+
+### With ggplot
+
+```{r}
+
+ggplot() +
+  geom_spatraster(data = heatmap_diff) +
+  scale_fill_gradient2(
+    low = "orange",
+    mid = "white",
+    high = "skyblue",
+    midpoint = 0,
+    na.value = NA,
+    name = "log(wet) -\nlog(dry)"
+  ) +
+  coord_sf() +
+  theme_bw()
+
+ggsave("outputs/east_alligator_wet_dry_heatmap_diff.png", 
+       width = 250, height = 150, units = "mm", scale = 0.75, dpi = 600)
+
+```
+
+:::
+
+## Connectivity raster
+
+```{r}
+
+betweenness_filename <- "betweenness_599traj_100m_steps10000_full.tif"
+betweenness_locations <- rast(paste0("outputs/alphaearth/2026-08-17_4/", betweenness_filename))
+plot(betweenness_locations)
+
+betweenness_locations_crop <- terra::crop(betweenness_locations, pig_subset_2250_aoi)
+water_layer_crop <- terra::crop(water_layer, pig_subset_2250_aoi)
+
+# Resample water_layer onto the same grid as betweenness_locations
+water_layer_resampled <- terra::resample(water_layer_crop, betweenness_locations_crop, method = "near")
+# Now mask
+betweenness_locations_crop_mask <- terra::mask(betweenness_locations_crop, water_layer_resampled, maskvalue = 1)
+
+plot(betweenness_locations_crop_mask)
+plot(log(betweenness_locations_crop_mask))
+plot(sqrt(betweenness_locations_crop_mask))
+
+writeRaster(betweenness_locations_crop_mask, paste0("mapping/", betweenness_filename, "_crop_masked.tif"), overwrite = TRUE)
+writeRaster(log(betweenness_locations_crop_mask), paste0("mapping/", betweenness_filename, "_crop_masked_log.tif"), overwrite = TRUE)
+writeRaster(sqrt(betweenness_locations_crop_mask), paste0("mapping/", betweenness_filename, "_crop_masked_sqrt.tif"), overwrite = TRUE)
 
 ```
 
