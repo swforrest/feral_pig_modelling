@@ -50,7 +50,7 @@ walk(packages, require, character.only = T)
 
 ```{r}
 
-pig_all_steps <- read_csv("data/pig_all_steps_20260707.csv")
+pig_all_steps <- read_csv("data/pig_all_steps_20261015.csv")
 
 # Convert timezone after import (resets to GMT)
 pig_all_steps <- pig_all_steps %>% 
@@ -148,6 +148,23 @@ if (interactive()) {
   pig_map
 }
 
+
+```
+
+## Plot a timelime of the GPS data collection
+
+```{r}
+
+pig_all_steps %>% #filter(name != "Unknown1") %>% 
+  ggplot(aes(x = t1_, y = name, colour = name)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  scale_colour_viridis_d() +
+  theme_classic() +
+  labs(x = "Date", y = "Pig ID") +
+  theme(legend.position = "none") 
+
+ggsave("outputs/east_alligator_pig_timeline.png", 
+       width = 250, height = 150, units = "mm", scale = 0.75, dpi = 600)
 
 ```
 
@@ -293,6 +310,9 @@ pig_all_steps %>%
 
 ```{r}
 
+n_names <- n_distinct(pig_all_steps$name)
+viridis_cols <- viridisLite::viridis(n_names)
+
 pig_all_steps %>% 
   ggplot() +
   geom_smooth(aes(x = hour, y = sl_, colour = name, fill = name),
@@ -317,9 +337,6 @@ ggsave("outputs/east_alligator_hourly_step_lengths.png",
 ## By ID by season
 
 ```{r}
-
-n_names <- n_distinct(pig_all_steps$name)
-viridis_cols <- viridisLite::viridis(n_names)
 
 pig_all_steps %>% 
   ggplot() +

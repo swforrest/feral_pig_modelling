@@ -54,7 +54,7 @@ walk(packages, require, character.only = T)
 #| message: false
 #| warning: false
 
-pig_gps <- read_csv("data/GPS_062226_131334.CSV")
+pig_gps <- read_csv("data/GPS_101526_092931.CSV")
 
 unique(pig_gps$`Device ID`)
 
@@ -280,7 +280,7 @@ pig_all_steps %>%
 ```{r}
 
 # set the name to match the input data frame
-write_csv(pig_all_steps, "data/pig_all_steps_20260707.csv")
+write_csv(pig_all_steps, "data/pig_all_steps_20261015.csv")
 
 ```
 
