@@ -54,7 +54,7 @@ walk(packages, require, character.only = T)
 #| message: false
 #| warning: false
 
-pig_gps <- read_csv("data/GPS_101526_092931.CSV")
+pig_gps <- read_csv("data/KNP_GPS_101526_092931.CSV")
 
 unique(pig_gps$`Device ID`)
 

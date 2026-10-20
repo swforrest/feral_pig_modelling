@@ -121,19 +121,234 @@ pal <- colorFactor(viridisLite::viridis(n_distinct(pig_all_steps_sf$name), optio
 # Thin the points for display and draw them with WebGL via leafgl instead.
 pig_map_pts <- pig_all_steps_sf %>%
   group_by(name) %>%
-  slice(seq(1, n(), by = 1)) %>% # every 10th fix per pig
+  slice(seq(1, n(), by = 1)) %>% # every ith fix per pig
   ungroup()
+
+# Break each pig's track wherever the gap between fixes is longer than this,
+# so the lines don't jump across periods with no data
+max_gap_hours <- 3
+
+pig_map_pts <- pig_map_pts %>%
+  arrange(name, t1_) %>%
+  group_by(name) %>%
+  mutate(new_seg = is.na(lag(t1_)) |
+           difftime(t1_, lag(t1_), units = "hours") > max_gap_hours,
+         seg = cumsum(new_seg)) %>%
+  ungroup()
+
+# one line per pig per continuous run of fixes
+pig_map_lines <- pig_map_pts %>%
+  group_by(name, seg) %>%
+  filter(n() > 1) %>%
+  summarise(do_union = FALSE, .groups = "drop") %>%
+  st_cast("LINESTRING")
+
+# Data for the time slider, sorted by time. Coordinates are stored as integers
+# (degrees * 1e5, ~1 m) and times as seconds since the first fix, which keeps
+# the JSON embedded in the html much smaller
+pig_levels <- sort(unique(pig_map_pts$name))
+t0 <- min(pig_map_pts$t1_)
+pig_time <- pig_map_pts %>% arrange(t1_)
+pig_time_xy <- st_coordinates(pig_time)
+
+pig_time_data <- list(
+  lng = as.integer(round(pig_time_xy[, "X"] * 1e5)),
+  lat = as.integer(round(pig_time_xy[, "Y"] * 1e5)),
+  t = as.integer(round(as.numeric(difftime(pig_time$t1_, t0, units = "secs")))),
+  pig = match(pig_time$name, pig_levels) - 1L,
+  brk = as.integer(pig_time$new_seg),
+  pigs = pig_levels,
+  cols = pal(pig_levels),
+  t0 = as.numeric(t0),
+  step = 30 * 60, # slider step (s), matching the 30 min fix rate
+  max_gap = max_gap_hours * 3600
+)
+
+# The time slider is a custom canvas layer (the leaftime package draws every
+# feature as SVG, which has the same problem as addCircleMarkers). Each redraw
+# only draws the fixes inside the current time window: the trail of each pig
+# as a line plus small points, and its latest fix as a large point (only if
+# that fix is within max_gap_hours of the slider time).
+pig_time_js <- r"--[
+function(el, x, d) {
+  var map = this;
+  var n = d.t.length, npig = d.pigs.length, STEP = d.step;
+  var t = d.t, pig = d.pig, brk = d.brk;
+  var lat = new Float64Array(n), lng = new Float64Array(n);
+  for (var i = 0; i < n; i++) { lat[i] = d.lat[i] / 1e5; lng[i] = d.lng[i] / 1e5; }
+  var tMax = Math.ceil(t[n - 1] / STEP) * STEP;
+  var state = { cur: 86400, win: 86400, timer: null };
+
+  // first index with t >= v
+  function lowerBound(v) {
+    var a = 0, b = n;
+    while (a < b) { var m = (a + b) >> 1; if (t[m] < v) a = m + 1; else b = m; }
+    return a;
+  }
+
+  function fmt(s) {
+    return new Date((d.t0 + s) * 1000).toLocaleString('en-AU', {
+      timeZone: 'Australia/Darwin', day: '2-digit', month: 'short',
+      year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  var TimeLayer = L.Layer.extend({
+    onAdd: function(m) {
+      this._canvas = L.DomUtil.create('canvas', 'leaflet-zoom-hide');
+      this._canvas.style.pointerEvents = 'none';
+      m.getPanes().overlayPane.appendChild(this._canvas);
+      m.on('moveend resize', this._reset, this);
+      this._reset();
+    },
+    onRemove: function(m) {
+      L.DomUtil.remove(this._canvas);
+      m.off('moveend resize', this._reset, this);
+    },
+    _reset: function() {
+      var size = map.getSize(), r = window.devicePixelRatio || 1, c = this._canvas;
+      L.DomUtil.setPosition(c, map.containerPointToLayerPoint([0, 0]));
+      c.width = size.x * r; c.height = size.y * r;
+      c.style.width = size.x + 'px'; c.style.height = size.y + 'px';
+      this.redraw();
+    },
+    redraw: function() {
+      var c = this._canvas, ctx = c.getContext('2d'), r = window.devicePixelRatio || 1;
+      ctx.setTransform(r, 0, 0, r, 0, 0);
+      ctx.clearRect(0, 0, c.width / r, c.height / r);
+
+      var lo = lowerBound(state.cur - state.win), hi = lowerBound(state.cur + 1);
+      var px = new Float32Array(hi - lo), py = new Float32Array(hi - lo);
+      var byPig = [], i, j, k, q, idx;
+      for (k = 0; k < npig; k++) byPig.push([]);
+      for (i = lo; i < hi; i++) {
+        var p = map.latLngToContainerPoint([lat[i], lng[i]]);
+        px[i - lo] = p.x; py[i - lo] = p.y;
+        byPig[pig[i]].push(i);
+      }
+
+      ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+      for (k = 0; k < npig; k++) {
+        idx = byPig[k];
+        if (!idx.length) continue;
+        ctx.strokeStyle = d.cols[k]; ctx.fillStyle = d.cols[k];
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        for (j = 0; j < idx.length; j++) {
+          q = idx[j] - lo;
+          if (j === 0 || brk[idx[j]]) ctx.moveTo(px[q], py[q]); else ctx.lineTo(px[q], py[q]);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        for (j = 0; j < idx.length; j++) {
+          q = idx[j] - lo;
+          ctx.moveTo(px[q] + 2.5, py[q]); ctx.arc(px[q], py[q], 2.5, 0, 2 * Math.PI);
+        }
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.strokeStyle = '#fff';
+      for (k = 0; k < npig; k++) {
+        idx = byPig[k];
+        if (!idx.length) continue;
+        i = idx[idx.length - 1];
+        if (state.cur - t[i] > d.max_gap) continue;
+        q = i - lo;
+        ctx.fillStyle = d.cols[k];
+        ctx.beginPath(); ctx.arc(px[q], py[q], 6, 0, 2 * Math.PI);
+        ctx.fill(); ctx.stroke();
+      }
+    }
+  });
+
+  var layer = new TimeLayer().addTo(map);
+
+  var ctrl = L.control({ position: 'bottomleft' });
+  ctrl.onAdd = function() {
+    var div = L.DomUtil.create('div', 'leaflet-bar');
+    div.style.cssText = 'background:#fff;padding:6px 10px;font:12px/1.5 sans-serif;';
+    div.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px">' +
+        '<button type="button" class="pt-play" style="width:30px">&#9654;</button>' +
+        '<input type="range" class="pt-slider" min="0" max="' + tMax + '" step="' + STEP +
+          '" value="' + state.cur + '" style="width:420px">' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-top:4px">' +
+        '<span class="pt-label" style="min-width:290px"></span>' +
+        'Trail <select class="pt-win">' +
+          '<option value="21600">6 hours</option>' +
+          '<option value="86400" selected>1 day</option>' +
+          '<option value="259200">3 days</option>' +
+          '<option value="604800">1 week</option>' +
+          '<option value="2592000">30 days</option>' +
+          '<option value="Infinity">All to date</option>' +
+        '</select>' +
+        'Speed <select class="pt-speed">' +
+          '<option value="1800">30 min</option>' +
+          '<option value="7200" selected>2 hours</option>' +
+          '<option value="21600">6 hours</option>' +
+          '<option value="86400">1 day</option>' +
+        '</select>' +
+      '</div>';
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.disableScrollPropagation(div);
+    return div;
+  };
+  ctrl.addTo(map);
+
+  var div = ctrl.getContainer();
+  var slider = div.querySelector('.pt-slider'), label = div.querySelector('.pt-label');
+  var playBtn = div.querySelector('.pt-play'), win = div.querySelector('.pt-win');
+  var speed = div.querySelector('.pt-speed');
+
+  function update() {
+    slider.value = state.cur;
+    label.textContent = fmt(Math.max(0, state.cur - state.win)) + '  –  ' + fmt(state.cur);
+    layer.redraw();
+  }
+  function stop() {
+    clearInterval(state.timer); state.timer = null; playBtn.innerHTML = '&#9654;';
+  }
+
+  slider.addEventListener('input', function() { state.cur = +slider.value; update(); });
+  win.addEventListener('change', function() { state.win = Number(win.value); update(); });
+  playBtn.addEventListener('click', function() {
+    if (state.timer) { stop(); return; }
+    if (state.cur >= tMax) state.cur = 0;
+    playBtn.innerHTML = '&#10074;&#10074;';
+    state.timer = setInterval(function() {
+      state.cur = Math.min(state.cur + Number(speed.value), tMax);
+      update();
+      if (state.cur >= tMax) stop();
+    }, 100);
+  });
+
+  update();
+}
+]--"
 
 pig_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
   addProviderTiles(providers$Esri.WorldImagery) %>%
+  leafgl::addGlPolylines(data = pig_map_lines,
+                         color = pal(pig_map_lines$name),
+                         opacity = 0.6,
+                         weight = 1.5,
+                         group = "All tracks") %>%
   leafgl::addGlPoints(data = pig_map_pts,
                       fillColor = pal(pig_map_pts$name),
                       fillOpacity = 0.75,
                       radius = 5,
                       popup = paste0("ID: ", pig_map_pts$name,
-                                     "<br>Time: ", pig_map_pts$t1_)) %>%
+                                     "<br>Time: ", pig_map_pts$t1_),
+                      group = "All fixes") %>%
   addLegend(position = "bottomright", pal = pal,
-            values = pig_map_pts$name, title = "Pig ID")
+            values = pig_map_pts$name, title = "Pig ID") %>%
+  # the full tracks and fixes are off by default so the time slider layer is
+  # readable; tick them on in the layers control
+  addLayersControl(overlayGroups = c("All tracks", "All fixes"),
+                   options = layersControlOptions(collapsed = FALSE)) %>%
+  hideGroup(c("All tracks", "All fixes")) %>%
+  htmlwidgets::onRender(pig_time_js, data = pig_time_data)
 
 # The VS Code htmlwidget viewer struggles with large maps, so when working
 # interactively write the map out and open it in the system browser. When the
@@ -147,7 +362,6 @@ if (interactive()) {
 } else {
   pig_map
 }
-
 
 ```
 
@@ -187,7 +401,6 @@ pig_aoi %>%
   st_write("mapping/pig_aoi_wgs84.geojson", driver = "GeoJSON", delete_dsn = TRUE)
 
 ```
-
 
 ### Use the temperature to check the timezone 
 
@@ -305,6 +518,56 @@ pig_all_steps %>%
   theme(legend.position = "none")
 
 ```
+
+### Binning instead of using a smooth
+
+```{r}
+
+bin_width <- 0.5  # hours
+
+bin_means <- pig_all_steps %>%
+  mutate(bin = floor(hour / bin_width) * bin_width + bin_width / 2) %>%
+  group_by(bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = sl_)) +
+  
+  geom_point(alpha = 0.1) +
+  
+    # mean with error bar
+  geom_errorbar(data = bin_means, inherit.aes = FALSE,
+                aes(x = bin, ymin = mean_sl - se, ymax = mean_sl + se),
+                width = bin_width * 0.3) +
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = mean_sl), colour = "black") +
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = bin, y = mean_sl), colour = "black", size = 2) +
+
+  #   # median and quartiles
+  # geom_line(data = bin_means, inherit.aes = FALSE,
+  #           aes(x = bin, y = q25), colour = "black", linetype = "dashed") +
+  # geom_line(data = bin_means, inherit.aes = FALSE,
+  #           aes(x = bin, y = q50), colour = "black") +
+  # geom_line(data = bin_means, inherit.aes = FALSE,
+  #           aes(x = bin, y = q75), colour = "black", linetype = "dashed") +
+  # geom_point(data = bin_means, inherit.aes = FALSE,
+  #            aes(x = bin, y = q50), colour = "black", size = 2) +
+  
+  scale_y_continuous("Step length (m)", limits = c(0, 500)) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
 
 ## By ID
 
@@ -432,6 +695,8 @@ pig_all_steps %>%
   ggplot(aes(x = temp, y = sl_, colour = season, fill = season)) +
   geom_point(alpha = 0.1) +
   geom_smooth(method = "gam", se = T) +
+  scale_y_continuous("Step length (m)") +
+  coord_cartesian(ylim = c(0, 200)) +
   theme_bw() 
 
 ```
@@ -497,6 +762,363 @@ ggplot() +
 max(shooting_locations$Date)
 
 ```
+
+# Overlap between shooting and pig GPS locations
+
+### Ensure the timezones match
+
+```{r}
+
+# check the timezone of the pig GPS locations
+tz(pig_all_steps_sf$t1_)
+
+# Add a posixct time column to the shooting locations
+filtered_shooting_locations <- filtered_shooting_locations %>% mutate(
+  shoot_id = row_number(),
+  shoot_time = as.POSIXct(Time, format = "%d-%b-%Y %H:%M:%S", tz = "Australia/Darwin")
+)
+
+# check the timezone of the shooting locations
+tz(filtered_shooting_locations$shoot_time)
+
+```
+
+## Summaries of shooting
+
+### Locations through time
+
+```{r}
+
+ggplot() +
+  geom_sf(data = filtered_shooting_locations, aes(colour = shoot_time), size = 0.5) +
+  coord_sf() +
+  theme_bw() +
+  theme(legend.position = "right")
+
+```
+
+### Hours of shooting
+
+```{r}
+
+filtered_shooting_locations <- filtered_shooting_locations %>% 
+  mutate(
+    shoot_hms = lubridate::hour(shoot_time) + lubridate::minute(shoot_time)/60 + lubridate::second(shoot_time)/3600
+  ) 
+
+filtered_shooting_locations %>%
+  ggplot() +
+  geom_histogram(aes(x = shoot_hms), bins = 30, fill = "red", colour = "black") +
+  scale_x_datetime("Shooting time") +
+  theme_bw()
+
+```
+
+
+### To create a null model to compare against
+
+```{r}
+
+# # create pseudo shooting times
+# filtered_shooting_locations <- filtered_shooting_locations %>% 
+#   mutate(
+#     shoot_time = shoot_time + lubridate::weeks(12)
+#   ) 
+
+```
+
+### Check the CRS
+
+```{r}
+
+# Check CRS
+st_crs(pig_all_steps_sf)
+st_crs(filtered_shooting_locations)
+
+# Update pig GPS locations to match the CRS of the shooting locations
+pig_all_steps_sf <- st_transform(pig_all_steps_sf, st_crs(filtered_shooting_locations))
+st_crs(pig_all_steps_sf)
+
+```
+
+```{r}
+
+temporal_window <- hours(6)  # x hours after the shooting event
+
+# add a row number to the pig_all_steps_sf data frame
+pig_all_steps_sf <- pig_all_steps_sf %>% 
+  mutate(pig_row = row_number())
+
+# spatial join: every pig point within x km of a shooting point
+hits <- st_join(pig_all_steps_sf, filtered_shooting_locations,
+                join = st_is_within_distance, dist = 2500) %>% 
+  filter(!is.na(shoot_id)) %>% 
+  # temporal filter: within the x hours AFTER the shooting timestamp
+  filter(t1_ >= shoot_time - temporal_window,
+         t1_ <= shoot_time + temporal_window)
+
+hits
+
+```
+
+## Alternative approach 
+
+```{r}
+
+# 1. Find all pig/shooting pairs within 2.5 km (returns a list of indices)
+idx <- st_is_within_distance(pig_all_steps_sf, filtered_shooting_locations, dist = 5000)
+
+# 2. Turn that into a table of matched pairs
+pairs <- tibble(
+  pig_row   = rep(seq_along(idx), lengths(idx)),
+  shoot_row = unlist(idx)
+)
+
+# 3. Distance between each matched pair, in metres
+pairs$dist_m <- as.numeric(
+  st_distance(pig_all_steps_sf[pairs$pig_row, ],
+              filtered_shooting_locations[pairs$shoot_row, ],
+              by_element = TRUE)
+)
+
+# 4. Attach the attributes from both objects
+hits <- bind_cols(
+  pig_all_steps_sf[pairs$pig_row, ],
+  filtered_shooting_locations[pairs$shoot_row, ] |> st_drop_geometry(), #|> rename_with(~ paste0("shoot_", .x)),
+  dist_m = pairs$dist_m
+)
+
+hits <- hits |>
+  filter(t1_ >= shoot_time - hours(6),
+         t1_ <= shoot_time + hours(6)) %>% 
+  mutate(
+    shoot_time_diff = as.numeric(difftime(t1_, shoot_time, units = "hours")),
+  ) 
+
+```
+
+## Plotting shooting info
+
+```{r}
+
+hits %>%        
+  ggplot(aes(x = shoot_time_diff, y = sl_, colour = dist_m)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  geom_point(alpha = 0.5) +
+  scale_y_continuous("Step length (m)") +
+  # coord_cartesian(ylim = c(0, 200)) +
+  theme_bw() 
+
+```
+
+### Keep the nearest in time
+
+For each shoot and each pig, take the pig GPS location that is nearest in time to the shooting event.
+
+```{r}
+  
+hits_nearest_time <- hits %>% 
+  group_by(name, shoot_id) %>% 
+  slice_min(abs(shoot_time_diff), n = 1)  %>% 
+  ungroup()
+
+hits_nearest_time
+
+```
+
+### Extract pig GPS locations either side of the focal shoot location
+
+```{r}
+
+shoot_focal_window <- 24 # time either side of focal shooting location (in hours)
+
+# 1. One row per focal pig/shooting event, with the temporal window
+focal <- hits_nearest_time |>
+  st_drop_geometry() |>
+  distinct(name, shoot_id, shoot_time) |>
+  mutate(win_start = shoot_time - hours(shoot_focal_window),
+         win_end   = shoot_time + hours(shoot_focal_window))
+
+# 2. Shooting locations, same CRS as the pigs, one row per shoot_id
+shoot_geom <- filtered_shooting_locations |>
+  select(shoot_id)
+
+# 3. Pull every GPS fix for that pig inside the window
+seqs <- pig_all_steps_sf |>
+  inner_join(focal,
+             by = join_by(name, between(t1_, win_start, win_end)),
+             relationship = "many-to-many")
+
+# 4. Distance (m) from each fix to its own focal shooting location
+seqs <- seqs |>
+  mutate(
+    dist_to_shoot_m = as.numeric(
+      st_distance(geometry,
+                  shoot_geom$geometry[match(shoot_id, shoot_geom$shoot_id)],
+                  by_element = TRUE)),
+    time_diff_hrs = as.numeric(difftime(t1_, shoot_time, units = "hours")),
+    period = if_else(time_diff_hrs < 0, "baseline", "response"),
+    seq_id = paste(name, shoot_id, sep = "_")
+  ) |>
+  arrange(seq_id, t1_)
+
+seqs
+
+```
+
+There are multiple shooting locations on the same day - we will therefore only look at the first shooting event for each pig on that day, and the GPS locations either side of that event.
+
+```{r}
+
+seqs_daily <- seqs %>% 
+  mutate(
+    shoot_date = lubridate::as_date(shoot_time)
+  ) %>% 
+  group_by(name, shoot_date) %>% 
+  slice_min(shoot_time, n = 1)  %>% 
+  ungroup()
+
+seqs_daily
+
+```
+
+## Plotting shooting info
+
+```{r}
+
+seqs_daily %>%        
+  ggplot(aes(x = time_diff_hrs, y = dist_to_shoot_m, colour = seq_id)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  geom_path(alpha = 0.5) +
+  # scale_y_continuous("Step length (m)") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+### Step lengths for baseline/response
+
+```{r}
+
+bin_width <- 0.5  # hours
+
+bin_means <- seqs_daily %>%
+  mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
+  group_by(bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+seqs_daily %>% #filter(name == "Dora the Explorer") %>%
+  ggplot(aes(x = time_diff_hrs, y = sl_, colour = seq_id)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  geom_path(alpha = 0.5) +
+  
+  # mean with error bar
+  # geom_errorbar(data = bin_means, inherit.aes = FALSE,
+  #               aes(x = bin, ymin = mean_sl - se, ymax = mean_sl + se),
+  #               width = bin_width * 0.3) +
+  # geom_line(data = bin_means, inherit.aes = FALSE,
+  #           aes(x = bin, y = mean_sl), colour = "black") +
+  # geom_point(data = bin_means, inherit.aes = FALSE,
+  #            aes(x = bin, y = mean_sl), colour = "black", size = 2) +
+  
+  # median and quartiles
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q25), colour = "black", linetype = "dashed") +
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q50), colour = "black") +
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q75), colour = "black", linetype = "dashed") +
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = bin, y = q50), colour = "black", size = 2) +
+  
+  scale_y_continuous("Step length (m)") +
+  scale_x_continuous("GPS time relative to shooting event (hours)", breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+  coord_cartesian(ylim = c(0, 750)) +
+  theme_bw() +
+  theme(legend.position = "none") 
+
+```
+
+
+
+
+
+
+### Add shooting info
+
+```{r}
+
+hits %>% 
+  mutate(
+    shoot_time_diff = as.numeric(difftime(t1_, shoot_time, units = "hours")),
+  )
+
+```
+
+
+### Summarise the shooting hits
+
+```{r}
+
+# summarise per shooting event
+hits %>% 
+  st_drop_geometry()  %>% 
+  count(shoot_id, name = "n_pig_points")
+
+# summarise per GPS location
+pig_GPS_hits <- hits %>% 
+  st_drop_geometry()  %>% 
+  count(pig_row, name = "n_shooting_hits")
+
+pig_GPS_hits
+
+pig_all_steps_sf_shoot <- left_join(pig_all_steps_sf, pig_GPS_hits, by = "pig_row")
+
+pig_all_steps_sf_shoot <- pig_all_steps_sf_shoot %>% 
+  mutate(
+    n_shooting_hits = ifelse(is.na(n_shooting_hits), 0, n_shooting_hits),
+    shooting_hit = ifelse(n_shooting_hits > 0, TRUE, FALSE)
+  )
+
+```
+
+### Summary of shooting hits
+
+```{r}
+
+pig_all_steps_sf_shoot %>% filter(shooting_hit == TRUE)
+
+pig_all_steps_sf_shoot %>% st_drop_geometry() %>%
+  filter(shooting_hit == TRUE) %>% 
+  summarise(
+    mean_hour = mean(hour, na.rm = TRUE),
+  )
+
+```
+
+## Plotting shooting info
+
+```{r}
+
+pig_all_steps_sf_shoot %>%        
+  filter(dt_hour < 0.75) %>% # keep the half-hour locations
+  ggplot(aes(x = as.factor(shooting_hit), y = sl_, colour = n_shooting_hits)) +
+  geom_jitter(alpha = 0.1) +
+  geom_violin(alpha = 0) +
+  scale_y_continuous("Step length (m)") +
+  coord_cartesian(ylim = c(0, 200)) +
+  theme_bw() 
+
+```
+
 
 
 # Import environmental data
