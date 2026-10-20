@@ -270,8 +270,10 @@ function(el, x, d) {
     div.innerHTML =
       '<div style="display:flex;align-items:center;gap:8px">' +
         '<button type="button" class="pt-play" style="width:30px">&#9654;</button>' +
+        '<button type="button" class="pt-back" title="Back 30 min">&#8249;</button>' +
         '<input type="range" class="pt-slider" min="0" max="' + tMax + '" step="' + STEP +
           '" value="' + state.cur + '" style="width:420px">' +
+        '<button type="button" class="pt-fwd" title="Forward 30 min">&#8250;</button>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:8px;margin-top:4px">' +
         '<span class="pt-label" style="min-width:290px"></span>' +
@@ -284,10 +286,14 @@ function(el, x, d) {
           '<option value="Infinity">All to date</option>' +
         '</select>' +
         'Speed <select class="pt-speed">' +
-          '<option value="1800">30 min</option>' +
-          '<option value="7200" selected>2 hours</option>' +
-          '<option value="21600">6 hours</option>' +
-          '<option value="86400">1 day</option>' +
+          '<option value="1800">30 min/s</option>' +
+          '<option value="3600">1 hour/s</option>' +
+          '<option value="10800">3 hours/s</option>' +
+          '<option value="21600">6 hours/s</option>' +
+          '<option value="43200">12 hours/s</option>' +
+          '<option value="86400" selected>1 day/s</option>' +
+          '<option value="259200">3 days/s</option>' +
+          '<option value="604800">1 week/s</option>' +
         '</select>' +
       '</div>';
     L.DomEvent.disableClickPropagation(div);
@@ -310,17 +316,35 @@ function(el, x, d) {
     clearInterval(state.timer); state.timer = null; playBtn.innerHTML = '&#9654;';
   }
 
+  // Playback speed is in seconds of data per real second. Each tick advances a
+  // whole number of slider steps, with at most 10 ticks per second, so slow
+  // speeds tick less often rather than moving by part of a step
+  function start() {
+    var rate = Number(speed.value);
+    var k = Math.max(1, Math.round(rate / 10 / STEP));
+    state.timer = setInterval(function() {
+      state.cur = Math.min(state.cur + k * STEP, tMax);
+      update();
+      if (state.cur >= tMax) stop();
+    }, 1000 * k * STEP / rate);
+  }
+  function stepBy(nSteps) {
+    state.cur = Math.min(Math.max(state.cur + nSteps * STEP, 0), tMax);
+    update();
+  }
+
   slider.addEventListener('input', function() { state.cur = +slider.value; update(); });
   win.addEventListener('change', function() { state.win = Number(win.value); update(); });
+  speed.addEventListener('change', function() {
+    if (state.timer) { clearInterval(state.timer); start(); }
+  });
+  div.querySelector('.pt-back').addEventListener('click', function() { stepBy(-1); });
+  div.querySelector('.pt-fwd').addEventListener('click', function() { stepBy(1); });
   playBtn.addEventListener('click', function() {
     if (state.timer) { stop(); return; }
     if (state.cur >= tMax) state.cur = 0;
     playBtn.innerHTML = '&#10074;&#10074;';
-    state.timer = setInterval(function() {
-      state.cur = Math.min(state.cur + Number(speed.value), tMax);
-      update();
-      if (state.cur >= tMax) stop();
-    }, 100);
+    start();
   });
 
   update();
@@ -341,6 +365,8 @@ pig_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
                       popup = paste0("ID: ", pig_map_pts$name,
                                      "<br>Time: ", pig_map_pts$t1_),
                       group = "All fixes") %>%
+  addScaleBar(position = "bottomleft",
+              options = scaleBarOptions(imperial = FALSE)) %>%
   addLegend(position = "bottomright", pal = pal,
             values = pig_map_pts$name, title = "Pig ID") %>%
   # the full tracks and fixes are off by default so the time slider layer is
