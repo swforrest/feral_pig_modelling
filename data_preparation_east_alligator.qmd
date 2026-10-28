@@ -39,7 +39,7 @@ abstract: |
 
 library(tidyverse)
 packages <- c("amt", "lubridate", 
-              "SDLfilter",
+              "SDLfilter", "sf",
               "terra", "suncalc",
               "beepr", "tictoc")
 walk(packages, require, character.only = T)

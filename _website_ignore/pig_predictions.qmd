@@ -1,0 +1,423 @@
+---
+title: "Simulation animations"
+author: "Scott Forrest"
+date: "`r Sys.Date()`"
+execute: 
+  cache: false
+bibliography: paperpile.bib
+toc: true
+number-sections: false
+format: 
+  html:
+    # self-contained: true
+    code-fold: show
+    code-tools: true
+    df-print: paged
+    code-line-numbers: true
+    code-overflow: scroll
+    fig-format: png
+    fig-dpi: 300
+  pdf:
+    fig-format: png
+    fig-dpi: 300
+    geometry: 
+      - top=30mm
+      - left=30mm
+editor:
+  source
+abstract: |
+  Preparing feral pig GPS tracking data. 
+---
+
+# Load packages
+
+```{r}
+#| label: packages
+#| code-summary: "Load packages"
+#| message: false
+#| warning: false
+
+# remotes::install_github("16EAGLE/moveVis")
+
+library(tidyverse)
+packages <- c("amt", "lubridate", 
+              "SDLfilter",
+              "terra", 
+              "beepr", "tictoc",
+              "moveVis", "move2", "sf")
+walk(packages, require, character.only = T)
+
+```
+
+# Import GPS tracking data
+
+```{r}
+#| label: import_data
+#| code-summary: "Import GPS tracking data"
+
+pig_gps <- read_csv("data/pig_all_steps_covs_subset_20260813.csv")
+
+pig_gps <- pig_gps %>% 
+  mutate(
+    t1_  = with_tz(t1_, tzone = "Australia/Darwin"),
+    t2_ = with_tz(t2_, tzone = "Australia/Darwin")
+  )
+    
+head(pig_gps)
+
+# keep the relevant data for the simulations
+pig_gps_betty <- pig_gps[2:2001, ]
+head(pig_gps_betty)
+
+pig_gps_betty_clean <- pig_gps_betty %>% 
+  transmute(
+    name = name,
+    x = x1_,
+    y = y1_,
+    t = t1_
+  )
+
+```
+
+# Read simulated trajectories
+
+## All starting from the same location
+
+```{r}
+
+pig_sim <- read_csv("outputs/alphaearth/2026-08-17_4/deepSSF_trajectories/deepSSF_pigs_10traj_1000steps_2026-08-21.csv")
+head(pig_sim)
+
+```
+
+## Add a timestamp to the simulated data
+
+```{r}
+
+start_time <- pig_gps_betty[[1, "t1_"]]
+time_sequence <- rep(seq(start_time, by = "hour", length.out = 1000), 10)
+
+pig_sim$t1_ <- time_sequence
+
+pig_sim_clean <- pig_sim %>% 
+  transmute(
+    name = trajectory_id,
+    x = x,
+    y = y,
+    t = t1_
+  )
+
+```
+
+
+### Combine datasets
+
+```{r}
+
+combined_data <- rbind(pig_gps_betty_clean, pig_sim_clean)
+
+```
+
+# moveVis animation
+
+## Convert to a `move2` object
+
+The coordinates are in GDA94 / Geoscience Australia Lambert (EPSG:3112), so we
+build an `sf` object with that CRS and transform to geographic coordinates
+(EPSG:4326), which is what `moveVis` expects for the basemap services.
+
+```{r}
+#| label: make_move2
+#| message: false
+
+# label the simulated trajectories so they are distinct from the observed track,
+# and so the track ids sort sensibly (sim_01 ... sim_10 rather than 1, 10, 2 ...)
+move_df <- combined_data %>%
+  mutate(
+    name = if_else(
+      name == "Betty",
+      "Betty",
+      sprintf("sim_%02d", suppressWarnings(as.integer(name)) + 1)
+      )
+  ) %>%
+  arrange(name, t) %>%
+  filter(!is.na(x), !is.na(y), !is.na(t))
+
+# how much of the sequence to animate - the full sequence is ~1000 hours (~42
+# days), which makes for a very long animation, so we subset by default
+n_days <- 10
+t_start <- min(move_df$t)
+move_df <- move_df %>% filter(t <= t_start + days(n_days))
+
+# Two quirks of moveVis 1.0.1 to work around here:
+#
+# 1. align_move() refers to the time column as `timestamp` internally, so the
+#    time column has to be named `timestamp` (naming it `t` throws
+#    "argument 1 is not a vector" inside align_move).
+#
+# 2. frames_spatial() reads the CRS by calling capture.output() on the printed
+#    move2 object and parsing line 5. If the object is tibble-backed, that print
+#    goes through print.tbl_df, and if anything in the session has replaced that
+#    method the print fails with "generic function not specified". Dropping to a
+#    plain data.frame sends the print through print.data.frame instead, and the
+#    CRS line moveVis wants is unchanged.
+move_data <- move_df %>%
+  rename(timestamp = t) %>%
+  as.data.frame() %>%                            # not a tibble - see note 2
+  st_as_sf(coords = c("x", "y"), crs = 3112) %>% # GDA94 / GA Lambert
+  st_transform(4326) %>%                         # WGS84 lon/lat for moveVis
+  mt_as_move2(time_column = "timestamp", track_id_column = "name")
+
+# head() rather than printing the whole object - it is a plain data.frame now,
+# so it does not self-truncate the way a tibble does
+head(move_data)
+mt_track_id_column(move_data)
+mt_time_column(move_data)
+
+# temporal resolution of each track - Betty is at 0.5 hours (30 min), the
+# simulated trajectories are at 1 hour (60 min)
+tapply(mt_time_lags(move_data, units = "min"), mt_track_id(move_data),
+       median, na.rm = TRUE)
+
+```
+
+## Align to a uniform time scale
+
+`align_move` interpolates all tracks onto a single, regular time scale, which
+resolves the mismatch between Betty's 0.5-hour fixes and the 1-hour simulated
+steps. Using a resolution finer than the native fix rate (e.g. 15 minutes)
+gives a smoother animation, at the cost of more frames.
+
+```{r}
+#| label: align_move
+#| message: false
+
+m <- align_move(move_data, res = units::set_units(15, "min"))
+
+# number of frames that will be produced
+length(unique(mt_time(m)))
+
+```
+
+## Create spatial frames
+
+```{r}
+#| label: frames_spatial
+#| message: false
+
+# observed track in red, simulated trajectories in a viridis ramp
+track_ids <- levels(as.factor(mt_track_id(m)))
+path_cols <- setNames(
+  viridisLite::viridis(length(track_ids), end = 0.9),
+  track_ids
+  )
+path_cols["Betty"] <- "red"
+
+frames <- frames_spatial(
+  m,
+  path_colours = unname(path_cols[track_ids]),
+  path_legend_title = "Track",
+  # satellite imagery is much more informative than the OSM basemaps in this
+  # part of Kakadu, where the OSM tiles are essentially blank
+  map_service = "esri",
+  map_type = "world_imagery",
+  # map_service = "osm", map_type = "topographic", # alternative basemap
+  alpha = 0.8,
+  path_fade = TRUE,
+  path_alpha = 0.75,
+  tail_length = 12, # ~3 hours of tail at 15 minute resolution
+  trace_show = TRUE,
+  trace_size = 0.5
+  ) %>%
+  add_labels(x = "Longitude", y = "Latitude") %>%
+  add_northarrow() %>%
+  add_scalebar() %>%
+  add_timestamps(type = "label") %>%
+  add_progress()
+
+length(frames)
+
+```
+
+
+
+```{r}
+#| label: preview_frame
+
+frames[[100]] # preview one of the frames, e.g. the 100th frame
+
+```
+
+## Animate the frames
+
+With `n_days = 7` at a 15-minute resolution this is ~670 frames, which takes a
+few minutes to render. Reduce `n_days`, or coarsen the `align_move` resolution
+to 30 or 60 minutes, for a quicker animation.
+
+```{r}
+#| label: animate_frames
+#| message: false
+
+dir.create("outputs/moveVis", recursive = TRUE, showWarnings = FALSE)
+
+animate_frames(
+  frames,
+  out_file = paste0("outputs/moveVis/deepSSF_pigs_", Sys.Date(), ".gif"),
+  fps = 50,
+  width = 1600,
+  height = 1600,
+  res = 200,
+  overwrite = TRUE
+  )
+
+```
+
+# From aerial survey data
+
+```{r}
+
+n_tracks <- 300
+
+pig_aerial_sim <- read_csv("outputs/alphaearth/2026-08-17_4/deepSSF_trajectories/deepSSF_pigs_599traj_1000steps_2026-08-21.csv")
+head(pig_aerial_sim)
+
+pig_aerial_sim <- pig_aerial_sim %>% filter(trajectory_id %in% 1:n_tracks)
+
+```
+
+
+
+```{r}
+
+time_sequence <- rep(seq(start_time, by = "hour", length.out = 1000), n_tracks)
+pig_aerial_sim$t <- time_sequence
+
+move_df2 <- pig_aerial_sim %>%
+  mutate(
+    name = sprintf("sim_%02d", suppressWarnings(as.integer(trajectory_id)) + 1)
+  ) %>%
+  arrange(name, t) %>%
+  filter(!is.na(x), !is.na(y), !is.na(t))
+
+# how much of the sequence to animate - the full sequence is ~1000 hours (~42
+# days), which makes for a very long animation, so we subset by default
+n_days <- 7
+t_start <- min(move_df2$t)
+move_df2 <- move_df2 %>% filter(t <= t_start + days(n_days))
+
+move_data <- move_df2 %>%
+  rename(timestamp = t) %>%
+  as.data.frame() %>%                            # not a tibble - see note 2
+  st_as_sf(coords = c("x", "y"), crs = 3112) %>% # GDA94 / GA Lambert
+  st_transform(4326) %>%                         # WGS84 lon/lat for moveVis
+  mt_as_move2(time_column = "timestamp", track_id_column = "name")
+
+# head() rather than printing the whole object - it is a plain data.frame now,
+# so it does not self-truncate the way a tibble does
+head(move_data)
+mt_track_id_column(move_data)
+mt_time_column(move_data)
+
+# temporal resolution of each track
+tapply(mt_time_lags(move_data, units = "min"), mt_track_id(move_data),
+       median, na.rm = TRUE)
+
+# align the simulated locations
+m <- align_move(move_data, res = units::set_units(60, "min"))
+
+# number of frames that will be produced
+length(unique(mt_time(m)))
+
+```
+
+## Create spatial frames
+
+```{r}
+#| label: frames_spatial
+#| message: false
+
+# observed track in red, simulated trajectories in a viridis ramp
+track_ids <- levels(as.factor(mt_track_id(m)))
+path_cols <- setNames(
+  viridisLite::turbo(length(track_ids), end = 1.0),
+  track_ids
+  )
+
+frames <- frames_spatial(
+  m,
+  path_colours = unname(path_cols[track_ids]),
+  path_legend_title = "Track",
+  map_service = "esri",
+  map_type = "world_imagery",
+  alpha = 0.8,
+  path_fade = TRUE,
+  path_alpha = 0.75,
+  path_legend = FALSE,
+  tail_length = 12, # ~3 hours of tail at 15 minute resolution
+  trace_show = TRUE,
+  trace_size = 0.5
+  ) %>%
+  add_labels(x = "Longitude", y = "Latitude") %>%
+  add_northarrow() %>%
+  add_scalebar() %>%
+  add_timestamps(type = "label") %>%
+  add_progress()
+
+length(frames)
+length(unique(unname(path_cols[track_ids])))
+
+```
+
+
+
+```{r}
+#| label: preview_frame
+
+frames[[50]] # preview one of the frames, e.g. the 100th frame
+
+```
+
+## Animate the frames
+
+With `n_days = 7` at a 15-minute resolution this is ~670 frames, which takes a
+few minutes to render. Reduce `n_days`, or coarsen the `align_move` resolution
+to 30 or 60 minutes, for a quicker animation.
+
+```{r}
+#| label: animate_frames
+#| message: false
+
+dir.create("outputs/moveVis", recursive = TRUE, showWarnings = FALSE)
+
+aspect_ratio <- 1.5
+
+# set output pixel dimensions to match
+out_height <- 1600
+out_width <- round(out_height * 1.5)
+
+animate_frames(
+  frames,
+  out_file = paste0("outputs/moveVis/deepSSF_pigs_aerial_survey", Sys.Date(), ".gif"),
+  fps = 50,
+  width = out_width,
+  height = out_height,
+  res = 200,
+  overwrite = TRUE
+  )
+
+```
+
+
+
+# References
+
+::: {#refs}
+:::
+
+# Session Information
+
+```{r}
+
+utils::sessionInfo()
+
+```

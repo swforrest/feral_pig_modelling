@@ -2,15 +2,29 @@ project:
   type: website
   output-dir: docs
   
-freeze: auto # re-render only when source changes
+execute:
+  freeze: auto # re-render only when source changes
 
 website:
   title: "Kakadu Pig Modelling"
+  favicon: icons/pig_image.jpeg
+  page-navigation: true
+  back-to-top-navigation: true
+  
   navbar:
     left:
-      - href: index.qmd
-        text: Home
-      - about.qmd
+      - text: "Home"
+        href: index.qmd
+      - text: "Data Preparation"
+        href: data_preparation_east_alligator.qmd
+      - text: "Shooting Responses"
+        href: shooting_analysis_east_alligator.qmd
+      - text: "Weather Responses"
+        href: weather_analysis_east_alligator.qmd
+        
+    right:
+      - icon: github
+        href: https://github.com/swforrest/feral_pig_modelling
 
 format:
   html:
