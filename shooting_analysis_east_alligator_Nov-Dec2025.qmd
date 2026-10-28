@@ -594,8 +594,8 @@ st_crs(pig_all_steps_sf)
 
 ```{r}
 
-# Find all pig/shooting pairs within 5 km (returns a list of indices)
-idx <- st_is_within_distance(pig_all_steps_sf, filtered_shooting_locations, dist = 2500)
+# Find all pig/shooting pairs within x km (returns a list of indices)
+idx <- st_is_within_distance(pig_all_steps_sf, filtered_shooting_locations, dist = 2000)
 
 # Turn that into a table of matched pairs
 pairs <- tibble(
@@ -1276,9 +1276,229 @@ ggsave("outputs/step_length_shooting_vs_pseudo_both.png",
 
 # Environmental responses
 
+### First shooting operation
+
 ```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
 
+# first shooting operation
+shooting_window_min <- lubridate::as_date("2025 11 01")
+shooting_window_max <- lubridate::as_date("2025 11 10")
 
+bin_width <- 0.5  # hours
+z <- qnorm(0.975) # 95% interval
+
+seqs_win <- seqs_daily_both %>%
+  filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
+  mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
+
+veg_cols <- grep("^veg_", names(seqs_win), value = TRUE)
+
+dir.create("outputs", showWarnings = FALSE)
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- seqs_win %>%
+    group_by(type, bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 0) %>%
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, aes(x = bin, colour = type, fill = type, group = type)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 2) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    labs(title = veg_label,
+         subtitle = "First shooting: 2025-11-05 to 2025-11-07",
+         colour = "Shoot", fill = "Shoot") +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(file.path("outputs", paste0(veg_col, "_shooting_vs_pseudo_first.png")),
+         plot = p, width = 150, height = 100, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("#### ", veg_label, "\n\n")
+  print(p)
+  cat("\n\n")
+}
+
+cat(":::\n")
+
+```
+
+### Second shooting operation
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+# second shooting operation
+shooting_window_min <- lubridate::as_date("2025 11 25")
+shooting_window_max <- lubridate::as_date("2025 12 14")
+
+bin_width <- 0.5  # hours
+z <- qnorm(0.975) # 95% interval
+
+seqs_win <- seqs_daily_both %>%
+  filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
+  mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
+
+veg_cols <- grep("^veg_", names(seqs_win), value = TRUE)
+
+dir.create("outputs", showWarnings = FALSE)
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- seqs_win %>%
+    group_by(type, bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 0) %>%
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, aes(x = bin, colour = type, fill = type, group = type)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 2) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    labs(title = veg_label,
+         subtitle = "Second shooting operations: 2025-11-30 to 2025-12-01",
+         colour = "Shoot", fill = "Shoot") +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(file.path("outputs", paste0(veg_col, "_shooting_vs_pseudo_second.png")),
+         plot = p, width = 150, height = 100, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("#### ", veg_label, "\n\n")
+  print(p)
+  cat("\n\n")
+}
+
+cat(":::\n")
+
+```
+
+### Both shooting operations
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+# first shooting operation
+shooting_window_min <- lubridate::as_date("2025 11 01")
+# shooting_window_max <- lubridate::as_date("2025 11 10")
+
+# second shooting operation
+# shooting_window_min <- lubridate::as_date("2025 11 25")
+shooting_window_max <- lubridate::as_date("2025 12 14")
+
+bin_width <- 0.5  # hours
+z <- qnorm(0.975) # 95% interval
+
+seqs_win <- seqs_daily_both %>%
+  filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
+  mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
+
+veg_cols <- grep("^veg_", names(seqs_win), value = TRUE)
+
+dir.create("outputs", showWarnings = FALSE)
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- seqs_win %>%
+    group_by(type, bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 0) %>%
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, aes(x = bin, colour = type, fill = type, group = type)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 2) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    labs(title = veg_label,
+         subtitle = "Both shooting operations: 2025-11-05 to 2025-11-07 and 2025-11-30 to 2025-12-01",
+         colour = "Shoot", fill = "Shoot") +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(file.path("outputs", paste0(veg_col, "_shooting_vs_pseudo_both.png")),
+         plot = p, width = 150, height = 100, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("#### ", veg_label, "\n\n")
+  print(p)
+  cat("\n\n")
+}
+
+cat(":::\n")
 
 ```
 

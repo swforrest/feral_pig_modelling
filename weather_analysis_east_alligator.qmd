@@ -1,0 +1,1541 @@
+---
+title: "Pig responses to weather"
+subtitle: "East Alligator"
+author: "Scott Forrest"
+date: "`r Sys.Date()`"
+execute: 
+  cache: false
+  warning: false
+bibliography: paperpile.bib
+toc: true
+number-sections: false
+format: 
+  html:
+    self-contained: true
+    code-fold: show
+    code-tools: true
+    df-print: paged
+    code-line-numbers: true
+    code-overflow: scroll
+    fig-format: png
+    fig-dpi: 300
+  pdf:
+    fig-format: png
+    fig-dpi: 300
+    geometry: 
+      - top=30mm
+      - left=30mm
+editor:
+  source
+abstract: |
+  Investigating how pig movement and habitat use patterns change with weather variables (temperature, rainfall, solar exposure) in the East Alligator region of Kakadu National Park.
+---
+
+# Load packages
+
+```{r}
+#| label: packages
+#| code-summary: "Load packages"
+#| message: false
+#| warning: false
+
+library(tidyverse)
+packages <- c("amt", "lubridate",
+              "terra", "sf",
+              "beepr", "tictoc")
+walk(packages, require, character.only = T)
+
+# prevent scientific notation in outputs
+options(scipen = 999)
+
+```
+
+# Create directories for outputs
+
+```{r}
+
+# general outputs directory
+outputs_dir <- "outputs/east_alligator/"
+dir.create(outputs_dir, showWarnings = FALSE, recursive = TRUE)
+
+# for plots with veg categories
+outputs_veg_dir <- file.path(outputs_dir, "veg/")
+dir.create(outputs_veg_dir, showWarnings = FALSE, recursive = TRUE)
+
+```
+
+# Import GPS tracking data
+
+```{r}
+
+pig_all_steps <- read_csv("data/pigs_east_alligator_steps_covs_20261015.csv")
+
+# Convert timezone after import (resets to UTC)
+pig_all_steps <- pig_all_steps %>% 
+  mutate(
+    t1_  = with_tz(t1_, tzone = "Australia/Darwin"),
+    t2_ = with_tz(t2_, tzone = "Australia/Darwin")
+    )
+
+```
+
+# Import shooting observations to get timestamps
+
+```{r}
+
+filtered_shooting_locations <- read_csv("data/filtered_shooting_locations_3112.csv")
+
+# Convert timezone after import (resets to UTC)
+filtered_shooting_locations <- filtered_shooting_locations %>% 
+  mutate(
+    shoot_time  = with_tz(shoot_time, tzone = "Australia/Darwin")
+    )
+
+```
+
+
+## Drop NAs from weather observations
+
+```{r}
+
+paste0("Original data = ", nrow(pig_all_steps), " steps")
+paste0("Without NAs = ", nrow(pig_all_steps %>% drop_na(max_temp, min_temp, rainfall, solar_exp)), " steps")
+paste0("Dropping ", round((1-nrow(pig_all_steps %>% drop_na(max_temp, min_temp, rainfall, solar_exp))/nrow(pig_all_steps))*100,2), "% of steps")
+
+pig_all_steps <- pig_all_steps %>% drop_na(max_temp, min_temp, rainfall, solar_exp)
+
+```
+
+
+## Plot the pig data
+
+```{r}
+
+# plot the data spatially coloured by ID
+pig_all_steps %>%
+  ggplot(aes(x = x1_, y = y1_, colour = name)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  coord_fixed() +
+  scale_colour_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+```
+
+### Use the temperature to check the timezone 
+
+Assuming hotter during the middle hours
+
+```{r}
+
+# by season
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = temp, colour = season, fill = season)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "gam", se = T) +
+  # scale_colour_viridis_d("Season") +
+  # scale_fill_viridis_d("Season") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+``` 
+
+## Step lengths by the month of the year
+
+```{r}
+
+bin_width <- 0.5  # hours
+
+bin_means <- pig_all_steps %>%
+  mutate(bin = floor(hour / bin_width) * bin_width + bin_width / 2) %>%
+  group_by(bin, month) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = sl_, 
+             colour = as.factor(month), fill = as.factor(month))) +
+  
+  # geom_point(alpha = 0.01) +
+  
+  # interquartile range as a ribbon
+  geom_ribbon(data = bin_means, inherit.aes = FALSE,
+              aes(x = bin, ymin = q25, ymax = q75, 
+                  fill = as.factor(month)),
+              alpha = 0.15, colour = alpha("black", 0.75), linewidth = 0.1) +
+
+  # median
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q50, colour = as.factor(month))) +
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = bin, y = q50, colour = as.factor(month)), size = 1) +
+  
+  scale_y_continuous("Step length (m)") +
+  scale_x_continuous("Hour of the day", breaks = seq(0, 24, by = 2)) +
+  coord_cartesian(ylim = c(0, 300)) +
+  scale_colour_viridis_d("Month") +
+  scale_fill_viridis_d("Month") +
+  labs(title = "Distance between GPS locations across the hours of the day",
+       subtitle = "Interquartile range (25th to 75th percentile) of step lengths") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "hourly_step_lengths_months.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Step lengths by the month of the year - day fraction
+
+### Add a day fraction bin to the data
+
+```{r}
+
+bin_width <- 2/48  # day_fraction ~ 1/2 an hour
+z <- qnorm(0.975) # 95% interval
+
+pig_all_steps <- pig_all_steps %>%
+  mutate(day_frac_bin = floor(day_fraction / bin_width) * bin_width + bin_width / 2,
+         .after = day_fraction)
+
+```
+
+### Calculate the mean step length for each day fraction bin and month
+
+```{r}
+
+bin_means <- pig_all_steps %>%
+  group_by(day_frac_bin, month) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+pig_all_steps %>% 
+  ggplot(aes(x = day_fraction, y = sl_, 
+             colour = month, fill = month)) +
+  
+  # interquartile range as a ribbon
+  geom_ribbon(data = bin_means, inherit.aes = FALSE,
+              aes(x = day_frac_bin, ymin = q25, ymax = q75, 
+                  fill = as.factor(month)),
+              alpha = 0.15, colour = alpha("black", 0.75), linewidth = 0.1) +
+  
+  geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+  annotate("text", x = c(0, 1), y = 295,
+           label = c("Sunrise", "Sunset"),
+           hjust = -0.1, vjust = 1, size = 3.5) +
+
+  # median
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = day_frac_bin, y = q50, colour = as.factor(month))) +
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = day_frac_bin, y = q50, colour = as.factor(month)), size = 1) +
+  
+  scale_y_continuous("Step length (m)") +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2)) +
+  coord_cartesian(ylim = c(0, 300)) +
+  scale_colour_viridis_d("Month") +
+  scale_fill_viridis_d("Month") +
+  labs(title = "Distance between GPS locations across the hours of the day",
+       subtitle = "Interquartile range (25th to 75th percentile) of step lengths") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "day_frac_step_lengths_months.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Daily distance travelled
+
+```{r}
+
+start_date <- min(pig_all_steps$date)
+bin_width <- 3 # days
+
+# daily distance travelled for each pig
+daily_distance_id <- pig_all_steps %>%
+  group_by(name, date) %>%
+  summarise(
+    sum_sl = sum(sl_, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# get the rolling mean of the daily distance travelled for each pig
+daily_distance_id_rolling_mean <- daily_distance_id %>%
+  mutate(
+    bin_num  = as.numeric(date - start_date) %/% bin_width,
+    date_bin = start_date + bin_num * bin_width + (bin_width-1)/2      # +2 = bin midpoint (5 days: 0-4)
+  ) %>%
+  group_by(name, date_bin) %>%
+  summarise(
+    id_sum_sl = mean(sum_sl, na.rm = TRUE),
+    q25 = quantile(sum_sl, probs = 0.25, na.rm = TRUE),
+    q50 = quantile(sum_sl, probs = 0.5,  na.rm = TRUE),
+    q75 = quantile(sum_sl, probs = 0.75, na.rm = TRUE),
+    n   = sum(!is.na(sum_sl)),
+    .groups = "drop"
+  )
+
+# average daily distance travelled across all pigs
+daily_distance_all <- daily_distance_id_rolling_mean %>%
+  group_by(date_bin) %>%
+  summarise(
+    mean_sum_sl = mean(id_sum_sl, na.rm = TRUE),
+    q25 = quantile(id_sum_sl, probs = 0.25, na.rm = TRUE),
+    q50 = quantile(id_sum_sl, probs = 0.5,  na.rm = TRUE),
+    q75 = quantile(id_sum_sl, probs = 0.75, na.rm = TRUE),
+    n   = n(),
+    .groups = "drop"
+  )
+
+```
+
+### Plot the daily distance travelled
+
+```{r}
+
+  ggplot() +
+    # individual pigs rolling mean
+    geom_line(data = daily_distance_id_rolling_mean,
+               aes(x = date_bin, y = id_sum_sl, 
+               colour = name),
+               alpha = 0.25) +
+    # interquartile range as a ribbon
+    geom_ribbon(data = daily_distance_all, inherit.aes = FALSE,
+                aes(x = date_bin, ymin = q25, ymax = q75),
+                alpha = 0.15, fill = "black", colour = alpha("black", 0.75), linewidth = 0.1) +
+    # mean for all pigs
+    geom_line(data = daily_distance_all, inherit.aes = FALSE,
+              aes(x = date_bin, y = mean_sum_sl)) +
+    geom_point(data = daily_distance_all, inherit.aes = FALSE,
+               aes(x = date_bin, y = mean_sum_sl), size = 1) +
+    
+    # to add shooting events to the plot
+    geom_vline(data = filtered_shooting_locations, inherit.aes = FALSE,
+               aes(xintercept = shoot_time), colour = "red", linetype = "dashed", alpha = 0.5) +
+    
+    scale_y_continuous("Daily distance travelled (m)", breaks = seq(0, 6000, by = 1000)) +
+    scale_x_date("") +
+    coord_cartesian(ylim = c(750, 6000)) +
+    scale_colour_viridis_d("Pig") +
+    labs(title = paste0("Daily distance travelled (rolling mean over ", bin_width, " days)"),
+         subtitle = "Shooting events shown as red lines") +
+    theme_bw() +
+    theme(legend.position = "none")
+
+ggsave(paste0(outputs_dir, "daily_distance_mean_", bin_width, "days.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+# Weather variables
+
+Click on the tabs below to view how the pig's daily movement varied for different weather variables. Here we are looking at how the the step lengths (which is the distance between GPS locations) varied across the hours of the day and the day fraction (where 0 = sunrise and 1 = sunset) for different weather conditions.
+
+## Create bins for the weather variables
+
+```{r}
+
+pig_all_steps <- pig_all_steps %>% 
+  mutate(
+    max_temp_bin = cut(max_temp,
+                       breaks = c(-Inf, seq(30, 38, by = 2), Inf),
+                       labels = c("<30", "30–32", "32–34", "34–36", "36–38", ">38"),
+                       include.lowest = TRUE,
+                       right = FALSE),
+    min_temp_bin = cut(min_temp,
+                       breaks = c(-Inf, seq(16, 26, by = 2), Inf),
+                       labels = c("<16", "16–18", "18–20", "20–22", "22–24", "24–26", ">26"),
+                       include.lowest = TRUE,
+                       right = FALSE),
+    rainfall_bin = cut(rainfall,
+                       breaks = c(0, 1, 5, 10, 20, 40, Inf),
+                       labels = c("0–1", "1–5", "5–10", "10–20", "20–40", ">40"),
+                       include.lowest = TRUE,
+                       right = TRUE),
+    solar_exp_bin = cut(solar_exp,
+                       breaks = c(-Inf, 10, 15, 20, 25, Inf),
+                       labels = c("<10", "10–15", "15–20", "20–25", ">25"),
+                       include.lowest = TRUE,
+                       right = TRUE),
+    .after = solar_exp
+    ) 
+
+```
+
+## Plot the bins
+
+::: {.panel-tabset}
+
+## Max daily temp
+
+```{r}
+
+pig_all_steps %>%
+  ggplot(aes(x = date, y = max_temp, color = max_temp_bin)) +
+  geom_hline(yintercept = seq(30, 38, by = 2), colour = "black", linetype = "dashed") +
+  geom_point() +
+  scale_y_continuous("Max daily temp (°C)", breaks = seq(28, 40, by = 2)) +
+  scale_colour_brewer(name = "Max daily\ntemp (°C)", palette = "Reds") +
+  theme_bw()
+
+ggsave(paste0(outputs_dir, "max_temp_bins.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Min daily temp
+
+```{r}
+
+pig_all_steps %>%
+  ggplot(aes(x = date, y = min_temp, color = min_temp_bin)) +
+  geom_hline(yintercept = seq(16, 26, by = 2), colour = "black", linetype = "dashed") +
+  geom_point() +
+  scale_y_continuous("Min daily temp (°C)", breaks = seq(12, 28, by = 2)) +
+  scale_colour_brewer(name = "Min daily\ntemp (°C)", palette = "Oranges") +
+  theme_bw()
+
+ggsave(paste0(outputs_dir, "min_temp_bins.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Rainfall
+
+```{r}
+
+pig_all_steps %>% 
+  ggplot(aes(x = date, y = rainfall, color = rainfall_bin)) +
+  geom_hline(yintercept = c(0, 1, 5, 10, 20, 40), colour = "black", linetype = "dashed") +
+  geom_point() +
+  scale_y_continuous("Daily rainfall (mm)") +
+  scale_colour_viridis_d("Daily\nRainfall\n(mm)", option = "H") +
+  theme_bw()
+
+ggsave(paste0(outputs_dir, "rainfall_bins.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Solar exposure
+
+```{r}
+
+pig_all_steps %>% 
+  ggplot(aes(x = date, y = solar_exp, color = solar_exp_bin)) +
+  geom_hline(yintercept = c(10, 15, 20, 25), colour = "black", linetype = "dashed") +
+  geom_point() +
+  scale_y_continuous("Daily\nsolar exposure (MJ/m²)", breaks = seq(0,30,5)) +
+  scale_colour_viridis_d("Daily\nsolar\nexposure\n(MJ/m²)", option = "C") +
+  theme_bw()
+
+ggsave(paste0(outputs_dir, "solar_exp_bins.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+:::
+
+## Step lengths and the hour of the day
+
+::: {.panel-tabset}
+
+## Max temp
+
+```{r}
+
+bin_width <- 0.5  # hours
+
+bin_means <- pig_all_steps %>%
+  mutate(bin = floor(hour / bin_width) * bin_width + bin_width / 2) %>%
+  group_by(bin, max_temp_bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = sl_, 
+             colour = max_temp_bin, fill = max_temp_bin)) +
+  
+  # interquartile range as a ribbon
+  geom_ribbon(data = bin_means, inherit.aes = FALSE,
+              aes(x = bin, ymin = q25, ymax = q75, 
+                  fill = as.factor(max_temp_bin)),
+              alpha = 0.15, colour = alpha("black", 0.75), linewidth = 0.1) +
+
+  # median
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q50, colour = as.factor(max_temp_bin))) +
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = bin, y = q50, colour = as.factor(max_temp_bin)), size = 1) +
+  
+  scale_y_continuous("Step length (m)") +
+  scale_x_continuous("Hour of the day", breaks = seq(0, 24, by = 2)) +
+  coord_cartesian(ylim = c(0, 300)) +
+  scale_colour_brewer(name = "Max daily\ntemp (°C)", palette = "Reds") +
+  scale_fill_brewer(name = "Max daily\ntemp (°C)", palette = "Reds") +
+  labs(title = "Distance between GPS locations across the hours of the day",
+       subtitle = "Interquartile range (25th to 75th percentile) of step lengths") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "hourly_step_lengths_max_temp.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Min temp
+
+```{r}
+
+bin_width <- 0.5  # hours
+
+bin_means <- pig_all_steps %>%
+  mutate(bin = floor(hour / bin_width) * bin_width + bin_width / 2) %>%
+  group_by(bin, min_temp_bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = sl_, 
+             colour = min_temp_bin, fill = min_temp_bin)) +
+  
+  # interquartile range as a ribbon
+  geom_ribbon(data = bin_means, inherit.aes = FALSE,
+              aes(x = bin, ymin = q25, ymax = q75, 
+                  fill = as.factor(min_temp_bin)),
+              alpha = 0.15, colour = alpha("black", 0.75), linewidth = 0.1) +
+
+  # median
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q50, colour = as.factor(min_temp_bin))) +
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = bin, y = q50, colour = as.factor(min_temp_bin)), size = 1) +
+  
+  scale_y_continuous("Step length (m)") +
+  scale_x_continuous("Hour of the day", breaks = seq(0, 24, by = 2)) +
+  coord_cartesian(ylim = c(0, 300)) +
+  scale_colour_brewer(name = "Min daily\ntemp (°C)", palette = "Oranges") +
+  scale_fill_brewer(name = "Min daily\ntemp (°C)", palette = "Oranges") +
+  labs(title = "Distance between GPS locations across the hours of the day",
+       subtitle = "Interquartile range (25th to 75th percentile) of step lengths") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "hourly_step_lengths_min_temp.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Rainfall
+
+```{r}
+
+bin_width <- 0.5  # hours
+
+bin_means <- pig_all_steps %>%
+  mutate(bin = floor(hour / bin_width) * bin_width + bin_width / 2) %>%
+  group_by(bin, rainfall_bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = sl_, 
+             colour = rainfall_bin, fill = rainfall_bin)) +
+  
+  # interquartile range as a ribbon
+  geom_ribbon(data = bin_means, inherit.aes = FALSE,
+              aes(x = bin, ymin = q25, ymax = q75, 
+                  fill = as.factor(rainfall_bin)),
+              alpha = 0.15, colour = alpha("black", 0.75), linewidth = 0.1) +
+
+  # median
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q50, colour = as.factor(rainfall_bin))) +
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = bin, y = q50, colour = as.factor(rainfall_bin)), size = 1) +
+  
+  scale_y_continuous("Step length (m)") +
+  scale_x_continuous("Hour of the day", breaks = seq(0, 24, by = 2)) +
+  coord_cartesian(ylim = c(0, 300)) +
+  scale_colour_viridis_d("Daily\nRainfall\n(mm)", option = "H") +
+  scale_fill_viridis_d("Daily\nRainfall\n(mm)", option = "H") +
+  labs(title = "Distance between GPS locations across the hours of the day",
+       subtitle = "Interquartile range (25th to 75th percentile) of step lengths") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "hourly_step_lengths_rainfall.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Solar exposure
+
+```{r}
+
+bin_width <- 0.5  # hours
+
+bin_means <- pig_all_steps %>%
+  mutate(bin = floor(hour / bin_width) * bin_width + bin_width / 2) %>%
+  group_by(bin, solar_exp_bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = sl_, 
+             colour = solar_exp_bin, fill = solar_exp_bin)) +
+  
+  # interquartile range as a ribbon
+  geom_ribbon(data = bin_means, inherit.aes = FALSE,
+              aes(x = bin, ymin = q25, ymax = q75, 
+                  fill = as.factor(solar_exp_bin)),
+              alpha = 0.15, colour = alpha("black", 0.75), linewidth = 0.1) +
+
+  # median
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q50, colour = as.factor(solar_exp_bin))) +
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = bin, y = q50, colour = as.factor(solar_exp_bin)), size = 1) +
+  
+  scale_y_continuous("Step length (m)") +
+  scale_x_continuous("Hour of the day", breaks = seq(0, 24, by = 2)) +
+  coord_cartesian(ylim = c(0, 300)) +
+  scale_colour_viridis_d("Solar\nexposure\n(MJ/m²)", option = "C") +
+  scale_fill_viridis_d("Solar\nexposure\n(MJ/m²)", option = "C") +
+  labs(title = "Distance between GPS locations across the hours of the day",
+       subtitle = "Interquartile range (25th to 75th percentile) of step lengths") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "hourly_step_lengths_solar_exp.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+:::
+
+## Step lengths and the fraction of the day
+
+Here, 0 = sunrise and 1 = sunset. The day fraction is calculated using the `suncalc` package, which uses the latitude and longitude of the GPS locations to calculate the sunrise and sunset times for each day.
+
+::: {.panel-tabset}
+
+## Max temp
+
+```{r}
+
+bin_means <- pig_all_steps %>%
+  group_by(day_frac_bin, max_temp_bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+pig_all_steps %>% 
+  ggplot(aes(x = day_frac_bin, y = sl_, 
+             colour = max_temp_bin, fill = max_temp_bin)) +
+  
+  # interquartile range as a ribbon
+  geom_ribbon(data = bin_means, inherit.aes = FALSE,
+              aes(x = day_frac_bin, ymin = q25, ymax = q75, 
+                  fill = as.factor(max_temp_bin)),
+              alpha = 0.15, colour = alpha("black", 0.75), linewidth = 0.1) +
+  
+  geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+  annotate("text", x = c(0, 1), y = 295,
+           label = c("Sunrise", "Sunset"),
+           hjust = -0.1, vjust = 1, size = 3.5) +
+
+  # median
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = day_frac_bin, y = q50, colour = as.factor(max_temp_bin))) +
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = day_frac_bin, y = q50, colour = as.factor(max_temp_bin)), size = 1) +
+  
+  scale_y_continuous("Step length (m)") +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2)) +
+  coord_cartesian(ylim = c(0, 300)) +
+  scale_colour_brewer(name = "Max daily\ntemp (°C)", palette = "Reds") +
+  scale_fill_brewer(name = "Max daily\ntemp (°C)", palette = "Reds") +
+  labs(title = "Distance between GPS locations across the hours of the day",
+       subtitle = "Interquartile range (25th to 75th percentile) of step lengths") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "day_frac_step_lengths_max_temp.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Min temp
+
+```{r}
+
+bin_means <- pig_all_steps %>%
+  group_by(day_frac_bin, min_temp_bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+pig_all_steps %>% 
+  ggplot(aes(x = day_frac_bin, y = sl_, 
+             colour = min_temp_bin, fill = min_temp_bin)) +
+  
+  # interquartile range as a ribbon
+  geom_ribbon(data = bin_means, inherit.aes = FALSE,
+              aes(x = day_frac_bin, ymin = q25, ymax = q75, 
+                  fill = as.factor(min_temp_bin)),
+              alpha = 0.15, colour = alpha("black", 0.75), linewidth = 0.1) +
+  
+  geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+  annotate("text", x = c(0, 1), y = 295,
+           label = c("Sunrise", "Sunset"),
+           hjust = -0.1, vjust = 1, size = 3.5) +
+
+  # median
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = day_frac_bin, y = q50, colour = as.factor(min_temp_bin))) +  
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = day_frac_bin, y = q50, colour = as.factor(min_temp_bin)), size = 1) +
+  
+  scale_y_continuous("Step length (m)") +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2)) +
+  coord_cartesian(ylim = c(0, 300)) +
+  scale_colour_brewer(name = "Min daily\ntemp (°C)", palette = "Oranges") +
+  scale_fill_brewer(name = "Min daily\ntemp (°C)", palette = "Oranges") +
+  labs(title = "Distance between GPS locations across the hours of the day",
+       subtitle = "Interquartile range (25th to 75th percentile) of step lengths") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "day_frac_step_lengths_min_temp.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Rainfall
+
+```{r}
+
+bin_means <- pig_all_steps %>%
+  group_by(day_frac_bin, rainfall_bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+pig_all_steps %>% 
+  ggplot(aes(x = day_frac_bin, y = sl_, 
+             colour = rainfall_bin, fill = rainfall_bin)) +
+  
+  # interquartile range as a ribbon
+  geom_ribbon(data = bin_means, inherit.aes = FALSE,
+              aes(x = day_frac_bin, ymin = q25, ymax = q75, 
+                  fill = as.factor(rainfall_bin)),
+              alpha = 0.15, colour = alpha("black", 0.75), linewidth = 0.1) +
+  
+  geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+  annotate("text", x = c(0, 1), y = 295,
+           label = c("Sunrise", "Sunset"),
+           hjust = -0.1, vjust = 1, size = 3.5) +
+
+  # median
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = day_frac_bin, y = q50, colour = as.factor(rainfall_bin))) +  
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = day_frac_bin, y = q50, colour = as.factor(rainfall_bin)), size = 1) +
+  
+  scale_y_continuous("Step length (m)") +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2)) +
+  coord_cartesian(ylim = c(0, 300)) +
+  scale_colour_viridis_d("Daily\nRainfall\n(mm)", option = "H") +
+  scale_fill_viridis_d("Daily\nRainfall\n(mm)", option = "H") +
+  labs(title = "Distance between GPS locations across the hours of the day",
+       subtitle = "Interquartile range (25th to 75th percentile) of step lengths") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "day_frac_step_lengths_rainfall.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Solar exposure
+
+```{r}
+
+bin_means <- pig_all_steps %>%
+  group_by(day_frac_bin, solar_exp_bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+pig_all_steps %>% 
+  ggplot(aes(x = day_frac_bin, y = sl_, 
+             colour = solar_exp_bin, fill = solar_exp_bin)) +
+  
+  # interquartile range as a ribbon
+  geom_ribbon(data = bin_means, inherit.aes = FALSE,
+              aes(x = day_frac_bin, ymin = q25, ymax = q75, 
+                  fill = as.factor(solar_exp_bin)),
+              alpha = 0.15, colour = alpha("black", 0.75), linewidth = 0.1) +
+  
+  geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+  annotate("text", x = c(0, 1), y = 295,
+           label = c("Sunrise", "Sunset"),
+           hjust = -0.1, vjust = 1, size = 3.5) +
+
+  # median
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = day_frac_bin, y = q50, colour = as.factor(solar_exp_bin))) +  
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = day_frac_bin, y = q50, colour = as.factor(solar_exp_bin)), size = 1) +
+  
+  scale_y_continuous("Step length (m)") +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2)) +
+  coord_cartesian(ylim = c(0, 300)) +
+  scale_colour_viridis_d("Solar\nexposure\n(MJ/m²)", option = "C") +
+  scale_fill_viridis_d("Solar\nexposure\n(MJ/m²)", option = "C") +
+  labs(title = "Distance between GPS locations across the hours of the day",
+       subtitle = "Interquartile range (25th to 75th percentile) of step lengths") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "day_frac_step_lengths_solar_exp.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+:::
+
+# Vegetation responses
+
+What vegetation classes were the pigs using at different times of the day? Here we look at the proportion of steps that were in each vegetation class across the day fraction (where 0 = sunrise and 1 = sunset) for each season.
+
+## Read in the vegetation data
+
+```{r}
+
+# in the data preparation script this was stored as `landcover_rast_merged`
+vegetation_classes <- terra::rast("mapping/landcover_east_alligator.tif")
+
+vegetation_classes_df <- as.data.frame(vegetation_classes,
+                                          xy = TRUE, na.rm = TRUE)
+
+```
+
+### Plot the vegetation classes with the data
+
+::: {.panel-tabset}
+
+## Without the pig GPS data
+
+```{r}
+
+ggplot() +
+  geom_raster(data = vegetation_classes_df, 
+              aes(x=x, y=y, fill = Veg_class)) +
+  coord_sf() +
+  scale_fill_viridis_d("Vegetation") +
+  scale_colour_manual(
+    "Season",
+    values = c("wet" = "skyblue", "dry" = "orange"),
+    labels = c("wet" = "Wet season", "dry" = "Dry season")) +
+  theme_bw() +
+  theme(legend.position = "right")
+
+```
+
+## With the pig GPS data
+
+```{r}
+
+ggplot() +
+  geom_raster(data = vegetation_classes_df, 
+              aes(x=x, y=y, fill = Veg_class)) +
+  geom_point(data = pig_all_steps,
+          aes(x = x1_, y = y1_, colour = season),
+          size = 0.1, alpha = 0.25) + 
+  coord_sf() +
+  scale_fill_viridis_d("Vegetation") +
+  scale_colour_manual(
+    "Season",
+    values = c("wet" = "skyblue", "dry" = "orange"),
+    labels = c("wet" = "Wet season", "dry" = "Dry season")) +
+  guides(colour = guide_legend(override.aes = list(size = 2, alpha = 1))) +
+  theme_bw() +
+  theme(legend.position = "right")
+
+```
+
+:::
+
+## Vegetation proportions across the day by season
+
+```{r}
+
+# proportion of each class per time bin
+veg_props <- pig_all_steps %>%
+  count(day_frac_bin, season, Veg_class) %>%
+  group_by(day_frac_bin, season) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup()
+
+veg_colours <- c(
+  "Dry Rainforest"          = "#1B5E3A",  # dark green
+  "Eucalypt Open Forest"    = "#B5772B",  # deep ochre
+  "Eucalypt Woodland"       = "#E0B65C",  # light ochre
+  "Floodplain Sedgeland"    = "#D6E2A3",  # pale yellow-green
+  "Melaleuca Woodland"      = "#A9CCE3",  # light blue
+  "Melaleuca Open Forest"   = "#5B97BF",  # mid blue
+  "Melaleuca Closed Forest" = "#2B5F8A",  # dark blue
+  "Mangrove"                = "#2A9D8F",  # teal
+  "Mudflat"                 = "#8A7968"   # grey-brown
+)
+
+# order veg classes so similar classes are next to each other
+# (first level is drawn at the top)
+veg_props <- veg_props %>%
+  mutate(Veg_class = factor(Veg_class, levels = names(veg_colours)))
+
+```
+
+::: {.panel-tabset}
+
+## Dry season
+
+```{r}
+
+veg_props %>% filter(season == "dry") %>%
+  ggplot(aes(x = day_frac_bin, y = prop, fill = Veg_class)) +
+  geom_area(colour = "white", linewidth = 0.2) +
+  
+  # add lines for sunrise and sunset (day_fraction = 0 and 1)
+  geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+  annotate("text", x = c(0, 1), y = Inf, 
+           label = c("Sunrise", "Sunset"),
+           hjust = -0.1, vjust = 2, size = 3.5,
+           colour = "white") +
+  
+  scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2),
+                       expand = c(0, 0)) +
+  labs(title = "Vegetation use across the day", subtitle = "Dry season", 
+       x = "Time", y = "Proportion of steps", fill = "Vegetation class") +
+  scale_fill_manual(values = veg_colours) +
+  theme_bw()
+
+ggsave(file.path(outputs_veg_dir, "veg_props_dry_season.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Wet season
+
+```{r}
+
+veg_props %>% filter(season == "wet") %>%
+  ggplot(aes(x = day_frac_bin, y = prop, fill = Veg_class)) +
+  geom_area(colour = "white", linewidth = 0.2) +
+  
+  # add lines for sunrise and sunset (day_fraction = 0 and 1)
+  geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+  annotate("text", x = c(0, 1), y = Inf, 
+           label = c("Sunrise", "Sunset"),
+           hjust = -0.1, vjust = 2, size = 3.5,
+           colour = "white") +
+  
+  scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2),
+                       expand = c(0, 0)) +
+  labs(title = "Vegetation use across the day", subtitle = "Wet season", 
+       x = "Time", y = "Proportion of steps", fill = "Vegetation class") +
+  scale_fill_manual(values = veg_colours) +
+  theme_bw()
+
+ggsave(file.path(outputs_veg_dir, "veg_props_wet_season.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+:::
+
+## Splitting into early/late wet/dry seasons
+
+```{r}
+
+pig_all_steps <- pig_all_steps %>%
+  mutate(season2 = case_when(
+    season == "dry" & month %in% c(5, 6, 7) ~ "early dry",
+    season == "dry" & month %in% c(8, 9, 10) ~ "late dry",
+    season == "wet" & month %in% c(11, 12, 1) ~ "early wet",
+    season == "wet" & month %in% c(2, 3, 4) ~ "late wet",
+    TRUE ~ NA_character_,
+  ), 
+  .after = season
+  )
+
+# proportion of each class per time bin
+veg_props2 <- pig_all_steps %>%
+  count(day_frac_bin, season2, Veg_class) %>%
+  group_by(day_frac_bin, season2) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup()
+
+```
+
+::: {.panel-tabset}
+
+## Early dry season
+
+```{r}
+
+veg_props2 %>% filter(season2 == "early dry") %>%
+  ggplot(aes(x = day_frac_bin, y = prop, fill = Veg_class)) +
+  geom_area(colour = "white", linewidth = 0.2) +
+  
+  # add lines for sunrise and sunset (day_fraction = 0 and 1)
+  geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+  annotate("text", x = c(0, 1), y = Inf, 
+           label = c("Sunrise", "Sunset"),
+           hjust = -0.1, vjust = 2, size = 3.5,
+           colour = "white") +
+  
+  scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2),
+                       expand = c(0, 0)) +
+  labs(title = "Vegetation use across the day", subtitle = "Early dry season (May–July)", 
+       x = "Time", y = "Proportion of steps", fill = "Vegetation class") +
+  scale_fill_manual(values = veg_colours) +
+  theme_bw()
+
+ggsave(file.path(outputs_veg_dir, "veg_props_early_dry_season.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Late dry season
+
+```{r}
+
+veg_props2 %>% filter(season2 == "late dry") %>%
+  ggplot(aes(x = day_frac_bin, y = prop, fill = Veg_class)) +
+  geom_area(colour = "white", linewidth = 0.2) +
+  
+  # add lines for sunrise and sunset (day_fraction = 0 and 1)
+  geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+  annotate("text", x = c(0, 1), y = Inf, 
+           label = c("Sunrise", "Sunset"),
+           hjust = -0.1, vjust = 2, size = 3.5,
+           colour = "white") +
+  
+  scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2),
+                       expand = c(0, 0)) +
+  labs(title = "Vegetation use across the day", subtitle = "Late dry season (Aug–Oct)", 
+       x = "Time", y = "Proportion of steps", fill = "Vegetation class") +
+  scale_fill_manual(values = veg_colours) +
+  theme_bw()
+
+ggsave(file.path(outputs_veg_dir, "veg_props_late_dry_season.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Early wet season
+
+```{r}
+
+veg_props2 %>% filter(season2 == "early wet") %>%
+  ggplot(aes(x = day_frac_bin, y = prop, fill = Veg_class)) +
+  geom_area(colour = "white", linewidth = 0.2) +
+  
+  # add lines for sunrise and sunset (day_fraction = 0 and 1)
+  geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+  annotate("text", x = c(0, 1), y = Inf, 
+           label = c("Sunrise", "Sunset"),
+           hjust = -0.1, vjust = 2, size = 3.5,
+           colour = "white") +
+  
+  scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2),
+                       expand = c(0, 0)) +
+  labs(title = "Vegetation use across the day", subtitle = "Early wet season (Nov–Jan)", 
+       x = "Time", y = "Proportion of steps", fill = "Vegetation class") +
+  scale_fill_manual(values = veg_colours) +
+  theme_bw()
+
+ggsave(file.path(outputs_veg_dir, "veg_props_early_wet_season.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Late wet season
+
+```{r}
+
+veg_props2 %>% filter(season2 == "late wet") %>%
+  ggplot(aes(x = day_frac_bin, y = prop, fill = Veg_class)) +
+  geom_area(colour = "white", linewidth = 0.2) +
+  
+  # add lines for sunrise and sunset (day_fraction = 0 and 1)
+  geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+  annotate("text", x = c(0, 1), y = Inf, 
+           label = c("Sunrise", "Sunset"),
+           hjust = -0.1, vjust = 2, size = 3.5,
+           colour = "white") +
+  
+  scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2),
+                       expand = c(0, 0)) +
+  labs(title = "Vegetation use across the day", subtitle = "Late wet season (Feb–April)", 
+       x = "Time", y = "Proportion of steps", fill = "Vegetation class") +
+  scale_fill_manual(values = veg_colours) +
+  theme_bw()
+
+ggsave(file.path(outputs_veg_dir, "veg_props_late_wet_season.png"), 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+:::
+
+## Months of the year
+
+At a finer scale, what about for the different months of the year, for each of the vegetation classes? Here we look at the proportion of fixes in different vegetation types across the day fraction (where 0 = sunrise and 1 = sunset) for each month of the year.
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+veg_cols <- grep("^veg_", names(pig_all_steps), value = TRUE)
+veg_cols <- veg_cols[veg_cols != "veg_water"] # drop the water category as it isn't used
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- pig_all_steps %>%
+    group_by(day_frac_bin, month) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 50) %>% # how many fixes per bin? (to avoid bins with very few fixes)
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, 
+              aes(x = day_frac_bin, 
+                  colour = as.factor(month), fill = as.factor(month))) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 1) +
+    
+    # add lines for sunrise and sunset (day_fraction = 0 and 1)
+    geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+    annotate("text", x = c(0, 1), y = Inf, 
+             label = c("Sunrise", "Sunset"),
+             hjust = -0.1, vjust = 2, size = 3.5) +
+    
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, 1), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2)) +
+    scale_colour_viridis_d("Month") +
+    scale_fill_viridis_d("Month") +
+    labs(title = veg_label,
+         # subtitle = "Daily usage across months"
+         ) +
+    theme_bw() +
+    theme(legend.position = "right")
+
+  ggsave(file.path(outputs_veg_dir, paste0(veg_col, "_months.png")),
+         plot = p, width = 150, height = 90, scale = 1.25, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("\n\n#### ", veg_label, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+# Weather and vegetation interactions
+
+::: {.panel-tabset}
+
+## Max daily temp
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- pig_all_steps %>%
+    group_by(day_frac_bin, max_temp_bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 50) %>% # how many fixes per bin? (to avoid bins with very few fixes)
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, 
+              aes(x = day_frac_bin, 
+                  colour = as.factor(max_temp_bin), fill = as.factor(max_temp_bin))) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 1) +
+    
+    # add lines for sunrise and sunset (day_fraction = 0 and 1)
+    geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+    annotate("text", x = c(0, 1), y = Inf, 
+             label = c("Sunrise", "Sunset"),
+             hjust = -0.1, vjust = 2, size = 3.5) +
+    
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, 1), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2)) +
+    scale_colour_brewer(name = "Max daily\ntemp (°C)", palette = "Reds") +
+    scale_fill_brewer(name = "Max daily\ntemp (°C)", palette = "Reds") +
+    labs(title = veg_label,
+         # subtitle = "Daily usage across max_temp_bins"
+         ) +
+    theme_bw() +
+    theme(legend.position = "right")
+
+  ggsave(file.path(outputs_veg_dir, paste0(veg_col, "_max_temp_bins.png")),
+         plot = p, width = 150, height = 90, scale = 1.25, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("\n\n#### ", veg_label, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+## Min daily temp
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- pig_all_steps %>%
+    group_by(day_frac_bin, min_temp_bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 50) %>% # how many fixes per bin? (to avoid bins with very few fixes)
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, 
+              aes(x = day_frac_bin, 
+                  colour = as.factor(min_temp_bin), fill = as.factor(min_temp_bin))) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 1) +
+    
+    # add lines for sunrise and sunset (day_fraction = 0 and 1)
+    geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+    annotate("text", x = c(0, 1), y = Inf, 
+             label = c("Sunrise", "Sunset"),
+             hjust = -0.1, vjust = 2, size = 3.5) +
+    
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, 1), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2)) +
+    scale_colour_brewer(name = "Min daily\ntemp (°C)", palette = "Oranges") +
+    scale_fill_brewer(name = "Min daily\ntemp (°C)", palette = "Oranges") +
+    labs(title = veg_label,
+         # subtitle = "Daily usage across min_temp_bins"
+         ) +
+    theme_bw() +
+    theme(legend.position = "right")
+
+  ggsave(file.path(outputs_veg_dir, paste0(veg_col, "_min_temp_bins.png")),
+         plot = p, width = 150, height = 90, scale = 1.25, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("\n\n#### ", veg_label, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+## Rainfall
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- pig_all_steps %>%
+    group_by(day_frac_bin, rainfall_bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 50) %>% # how many fixes per bin? (to avoid bins with very few fixes)
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, 
+              aes(x = day_frac_bin, 
+                  colour = as.factor(rainfall_bin), fill = as.factor(rainfall_bin))) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 1) +
+    
+    # add lines for sunrise and sunset (day_fraction = 0 and 1)
+    geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+    annotate("text", x = c(0, 1), y = Inf, 
+             label = c("Sunrise", "Sunset"),
+             hjust = -0.1, vjust = 2, size = 3.5) +
+    
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, 1), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2)) +
+    scale_colour_viridis_d("Daily\nRainfall\n(mm)", option = "H") +
+    scale_fill_viridis_d("Daily\nRainfall\n(mm)", option = "H") +
+    labs(title = veg_label,
+         # subtitle = "Daily usage across rainfall_bins"
+         ) +
+    theme_bw() +
+    theme(legend.position = "right")
+
+  ggsave(file.path(outputs_veg_dir, paste0(veg_col, "_rainfall_bins.png")),
+         plot = p, width = 150, height = 90, scale = 1.25, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("\n\n#### ", veg_label, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+## Solar exposure
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- pig_all_steps %>%
+    group_by(day_frac_bin, solar_exp_bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 50) %>% # how many fixes per bin? (to avoid bins with very few fixes)
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, 
+              aes(x = day_frac_bin, 
+                  colour = as.factor(solar_exp_bin), fill = as.factor(solar_exp_bin))) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 1) +
+    
+    # add lines for sunrise and sunset (day_fraction = 0 and 1)
+    geom_vline(xintercept = c(0,1), colour = "black", linetype = "dashed") +
+    annotate("text", x = c(0, 1), y = Inf, 
+             label = c("Sunrise", "Sunset"),
+             hjust = -0.1, vjust = 2, size = 3.5) +
+    
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, 1), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("Day fraction", 
+                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2)) +
+    scale_colour_viridis_d("Daily\nsolar\nexposure\n(MJ/m²)", option = "C") +
+    scale_fill_viridis_d("Daily\nsolar\nexposure\n(MJ/m²)", option = "C") +
+    labs(title = veg_label,
+         # subtitle = "Daily usage across solar_exp_bins"
+         ) +
+    theme_bw() +
+    theme(legend.position = "right")
+
+  ggsave(file.path(outputs_veg_dir, paste0(veg_col, "_solar_exp_bins.png")),
+         plot = p, width = 150, height = 90, scale = 1.25, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("\n\n#### ", veg_label, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+:::
+
+# References
+
+::: {#refs}
+:::
+
+# Session Information
+
+```{r}
+
+utils::sessionInfo()
+
+```

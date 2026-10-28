@@ -16,10 +16,10 @@ format:
     code-line-numbers: true
     code-overflow: scroll
     fig-format: png
-    fig-dpi: 300
+    fig-dpi: 150
   pdf:
     fig-format: png
-    fig-dpi: 300
+    fig-dpi: 150
     geometry: 
       - top=30mm
       - left=30mm
@@ -50,18 +50,13 @@ walk(packages, require, character.only = T)
 
 ```{r}
 
-pig_all_steps <- read_csv("data/pig_all_steps_20261015.csv")
+pig_all_steps <- read_csv("data/pigs_east_alligator_steps_covs_20261015.csv")
 
 # Convert timezone after import (resets to GMT)
 pig_all_steps <- pig_all_steps %>% 
   mutate(
     t1_  = with_tz(t1_, tzone = "Australia/Darwin"),
-    t2_ = with_tz(t2_, tzone = "Australia/Darwin"), 
-    hour = hour(t1_) + minute(t1_)/60 + second(t1_)/3600,
-    hour_round = hour(t1_),
-    month = month(t1_),
-    season = case_when(month %in% c(11,12, 1, 2, 3, 4) ~ "wet",
-                       month %in% seq(5,10) ~ "dry")
+    t2_ = with_tz(t2_, tzone = "Australia/Darwin")
     )
 
 ```
@@ -81,24 +76,18 @@ pig_all_steps %>%
 
 ```
 
-### Plot with east alligator subset
+## Create an sf object of the data
 
 ```{r}
 
-pig_all_steps %>% 
-  filter(x1_ > -170000) %>%
-  ggplot(aes(x = x1_, y = y1_, colour = name)) +
-  geom_point(alpha = 0.5, size = 1) + 
-  coord_fixed() +
-  scale_colour_viridis_d() +
-  theme_classic() +
-  theme(legend.position = "none")
-  
-pig_all_steps <- pig_all_steps %>% filter(x1_ > -170000)
-
-paste0("There are ", nrow(pig_all_steps), " pig locations from ", length(unique(pig_all_steps$name)), " individuals in the subset.")
+# convert to an sf object (x1_/y1_ are in GDA94 / GA Lambert, EPSG:3112)
+# and reproject to WGS84 (EPSG:4326) for leaflet
+pig_all_steps_sf <- pig_all_steps %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>%
+  st_transform(crs = 4326)
 
 ```
+
 
 ## Use leaflet to plot the data
 
@@ -106,12 +95,6 @@ paste0("There are ", nrow(pig_all_steps), " pig locations from ", length(unique(
 #| label: leaflet-map
 #| message: false
 #| warning: false
-
-# convert to an sf object (x1_/y1_ are in GDA94 / GA Lambert, EPSG:3112)
-# and reproject to WGS84 (EPSG:4326) for leaflet
-pig_all_steps_sf <- pig_all_steps %>%
-  st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>%
-  st_transform(crs = 4326)
 
 pal <- colorFactor(viridisLite::viridis(n_distinct(pig_all_steps_sf$name), option = "H"),
                     domain = pig_all_steps_sf$name)
@@ -391,24 +374,7 @@ if (interactive()) {
 
 ```
 
-## Plot a timelime of the GPS data collection
-
-```{r}
-
-pig_all_steps %>% #filter(name != "Unknown1") %>% 
-  ggplot(aes(x = t1_, y = name, colour = name)) +
-  geom_point(alpha = 0.5, size = 1) + 
-  scale_colour_viridis_d() +
-  theme_classic() +
-  labs(x = "Date", y = "Pig ID") +
-  theme(legend.position = "none") 
-
-ggsave("outputs/east_alligator_pig_timeline.png", 
-       width = 250, height = 150, units = "mm", scale = 0.75, dpi = 600)
-
-```
-
-## Create a bounding box around the pig data to crop the other layers by
+## Create a bounding box around the pig data to crop layers by
 
 ```{r}
 
@@ -536,12 +502,14 @@ There does appear to be a temporal trend, with larger step lengths around dawn a
 ```{r}
 
 pig_all_steps %>% 
-  ggplot(aes(x = hour, y = sl_)) +
+  ggplot(aes(x = hour, y = sl_, colour = as.factor(month), fill = as.factor(month))) +
   geom_point(alpha = 0.1) +
   geom_smooth(method = "gam", se = T) +
   scale_y_continuous("Step length (m)", limits = c(0, 500)) +
+  scale_colour_viridis_d("Month") +
+  scale_fill_viridis_d("Month") +
   theme_bw() +
-  theme(legend.position = "none")
+  theme(legend.position = "right")
 
 ```
 
@@ -553,7 +521,7 @@ bin_width <- 0.5  # hours
 
 bin_means <- pig_all_steps %>%
   mutate(bin = floor(hour / bin_width) * bin_width + bin_width / 2) %>%
-  group_by(bin) %>%
+  group_by(bin, month) %>%
   summarise(
     mean_sl = mean(sl_, na.rm = TRUE),
     se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
@@ -565,35 +533,37 @@ bin_means <- pig_all_steps %>%
   )
 
 pig_all_steps %>% 
-  ggplot(aes(x = hour, y = sl_)) +
+  ggplot(aes(x = hour, y = sl_, 
+             colour = as.factor(month), fill = as.factor(month))) +
   
-  geom_point(alpha = 0.1) +
+  # geom_point(alpha = 0.01) +
   
-    # mean with error bar
-  geom_errorbar(data = bin_means, inherit.aes = FALSE,
-                aes(x = bin, ymin = mean_sl - se, ymax = mean_sl + se),
-                width = bin_width * 0.3) +
-  geom_line(data = bin_means, inherit.aes = FALSE,
-            aes(x = bin, y = mean_sl), colour = "black") +
-  geom_point(data = bin_means, inherit.aes = FALSE,
-             aes(x = bin, y = mean_sl), colour = "black", size = 2) +
+  # interquartile range as a ribbon
+  geom_ribbon(data = bin_means, inherit.aes = FALSE,
+              aes(x = bin, ymin = q25, ymax = q75, 
+                  fill = as.factor(month)),
+              alpha = 0.15, colour = alpha("black", 0.75), linewidth = 0.1) +
 
-  #   # median and quartiles
-  # geom_line(data = bin_means, inherit.aes = FALSE,
-  #           aes(x = bin, y = q25), colour = "black", linetype = "dashed") +
-  # geom_line(data = bin_means, inherit.aes = FALSE,
-  #           aes(x = bin, y = q50), colour = "black") +
-  # geom_line(data = bin_means, inherit.aes = FALSE,
-  #           aes(x = bin, y = q75), colour = "black", linetype = "dashed") +
-  # geom_point(data = bin_means, inherit.aes = FALSE,
-  #            aes(x = bin, y = q50), colour = "black", size = 2) +
+  # median
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q50, colour = as.factor(month))) +
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = bin, y = q50, colour = as.factor(month)), size = 1) +
   
-  scale_y_continuous("Step length (m)", limits = c(0, 500)) +
+  scale_y_continuous("Step length (m)") +
+  scale_x_continuous("Hour of the day", breaks = seq(0, 24, by = 2)) +
+  coord_cartesian(ylim = c(0, 300)) +
+  scale_colour_viridis_d("Month") +
+  scale_fill_viridis_d("Month") +
+  labs(title = "Distance between GPS locations across the hours of the day",
+       subtitle = "Interquartile range (25th to 75th percentile) of step lengths") +
   theme_bw() +
-  theme(legend.position = "none")
+  theme(legend.position = "right")
+
+ggsave("outputs/east_alligator_binned_hourly_step_lengths_months.png", 
+       width = 150, height = 90, units = "mm", scale = 1.25, dpi = 600)
 
 ```
-
 
 ## By ID
 
@@ -743,366 +713,6 @@ pig_all_steps %>%
 
 ```
 
-# Import environmental data
-
-## Sentinel-2 data
-
-```{r}
-
-s2 <- rast("mapping/feral_pig_aoi_S2_median_full_2025-09-12_to_2026-06-23.tif")
-# plot(s2)
-
-```
-
-## NDVI, NDWI and NDMI data
-
-```{r}
-
-s2_indices <- rast("mapping/feral_pig_aoi_S2_indices_2025-09-12_to_2026-06-23.tif")
-plot(s2_indices)
-
-ndvi <- s2_indices$NDVI / 10000
-ndwi <- s2_indices$NDWI / 10000
-ndmi <- s2_indices$NDMI / 10000
-
-plot(ndvi)
-plot(ndwi)
-plot(ndmi)
-
-ndvi_crop <- crop(ndvi, pig_aoi)
-plot(ndvi_crop)
-
-```
-
-## AlphaEarth embeddings
-
-```{r}
-
-# alpha_earth_1 <- rast("mapping/feral_pig_aoi_alphaearth_2025-0000000000-0000000000.tif")
-# plot(alpha_earth_1)
-# alpha_earth_2 <- rast("mapping/feral_pig_aoi_alphaearth_2025-0000000000-0000003072.tif")
-# plot(alpha_earth_2)
-
-```
-
-## Elevation data
-
-```{r}
-
-elevation <- rast("mapping/DEM.tif")
-plot(elevation)
-
-elevation_proj <- terra::project(elevation, "EPSG:3112")
-
-# align with the S2 indices
-elevation_aligned <- terra::resample(elevation_proj, s2_indices, method = "bilinear")
-plot(elevation_aligned)
-
-writeRaster(elevation_aligned, "mapping/DEM_3112.tif", overwrite = TRUE)
-
-```
-
-## Slope
-
-```{r}
-
-slope <- terrain(elevation_aligned, "slope", unit = "degrees")
-plot(slope)
-
-writeRaster(slope, "mapping/slope_3112.tif", overwrite = TRUE)
-
-```
-
-## Landcover data
-
-```{r}
-
-# Import shapefile of landcover data using sf
-landcover <- st_read("mapping/VegTypes_CDU2025.shp")
-landcover
-
-# Import shapefile of landcover data using terra
-# landcover <- vect("mapping/VegTypes_CDU2025.shp")
-
-```
-
-### Crop the landcover data
-
-```{r}
-
-landcover_cropped <- landcover %>% 
-  st_transform(crs = 3112) %>% 
-  st_crop(pig_aoi) 
-
-```
-
-### Plot the landcover data
-
-```{r}
-
-ggplot() +
-  geom_sf(data = landcover_cropped, aes(fill = Veg_class), colour = NA) + 
-  geom_sf(data = pig_all_steps_sf, aes(colour = season),
-          size = 0.1) + #aes(colour = name), colour = "black", , alpha = 0.1
-  coord_sf() +
-  scale_fill_viridis_d("Vegetation Class") + #option = "H"
-  scale_colour_manual(
-    "Season",
-    values = c("wet" = "skyblue", "dry" = "orange"),
-    labels = c("wet" = "Wet season", "dry" = "Dry season")) +
-  theme_bw() + 
-  theme(legend.position = "right") 
-
-ggsave("outputs/east_alligator_landcover.png",
-       width = 260, height = 150, units = "mm", scale = 1.1, dpi = 600)
-
-```
-
-### How many landcover types are there?
-
-```{r}
-
-unique(landcover_cropped$Veg_class)
-length(unique(landcover_cropped$Veg_class))
-
-```
-
-### Create landcover raster layers for each landcover type
-
-One binary (0/1) layer per vegetation class, on the same grid as the Sentinel-2
-exports so that all of the covariates stack without any resampling.
-
-```{r}
-#| label: landcover-dummy
-
-# Use the ndvi layer as the template grid (20 m, EPSG:3112) so the
-# landcover layers line up cell-for-cell with the remotely sensed covariates
-lc_template <- deepcopy(ndvi)
-lc_template[] <- NA # keep the geometry, drop the values
-
-# Rasterise the polygons; a character field gives a categorical raster, where
-# the levels table maps the integer cell values back to the class names
-landcover_rast <- rasterize(vect(landcover_cropped), lc_template,
-                            field = "Veg_class")
-plot(landcover_rast)
-lc_levels <- levels(landcover_rast)[[1]]
-
-```
-
-### What frequency do they occur in the data?
-
-```{r}
-
-landcover_vals <- terra::extract(landcover_rast, matrix(c(pig_all_steps$x2_, pig_all_steps$y2_), ncol = 2))
-pig_all_steps_covs <- bind_cols(pig_all_steps, landcover_vals) 
-
-# pig_all_steps_covs %>% 
-#   ggplot() +
-#   geom_bar(aes(y = Veg_class, fill = season),
-#            colour = "black",
-#            position = "dodge") +
-#   scale_fill_manual(
-#     "Season",
-#     values = c("wet" = "skyblue", "dry" = "orange"),
-#     labels = c("wet" = "Wet season", "dry" = "Dry season")) +
-#   scale_y_discrete("Vegetation Class") +
-#   scale_x_continuous("Pig GPS locations") +
-#   theme_bw() +
-#   theme(legend.position = "none")
-
-pig_all_steps_covs %>%
-  count(Veg_class, season) %>%
-  group_by(season) %>%
-  mutate(prop = n / sum(n)) %>%
-  ungroup() %>%
-  ggplot(aes(y = Veg_class, x = prop, fill = season)) +
-  geom_col(position = position_dodge(width = 0.8), width = 0.7,
-           colour = "black") +
-  scale_fill_manual(
-    "Season",
-    values = c("wet" = "skyblue", "dry" = "orange"),
-    labels = c("wet" = "Wet season", "dry" = "Dry season")) +
-  scale_y_discrete("Vegetation Class") +
-  scale_x_continuous("Proportion of season's locations", labels = scales::percent) +
-  theme_bw() +
-  theme(
-    legend.position = "inside",
-    legend.position.inside = c(0.95, 0.95),
-    legend.justification = c("right", "top"),
-    legend.background = element_rect(fill = alpha("white", 0.7), colour = NA)
-  )
-
-ggsave("outputs/east_alligator_habitat_use_seasonal.png",
-       width = 260, height = 150, units = "mm", scale = 0.75, dpi = 1000)
-
-```
-
-### Recode based on their frequency in the data
-
-```{r}
-
-recode_df <- data.frame(
-  
-  old = c("Wet Rainforest Springfed", 
-          "Water", 
-          "Mudflat",
-          "Melaleuca Woodland", 
-          "Melaleuca Open Woodland",
-          "Melaleuca Open Forest", 
-          "Melaleuca Closed Forest",
-          "Mangrove", 
-          "Grassland",
-          "Floodplain Sedgeland",
-          "Eucalypt Woodland", 
-          "Eucalypt Open Woodland",
-          "Eucalypt Open Forest", 
-          "Eucalypt Closed Forest",
-          "Dry Rainforest"),
-  
-  new = c("Dry Rainforest", 
-          "Water", 
-          "Mudflat",
-          "Melaleuca Woodland", 
-          "Melaleuca Woodland",
-          "Melaleuca Open Forest", 
-          "Melaleuca Closed Forest",
-          "Mangrove", 
-          "Floodplain Sedgeland",
-          "Floodplain Sedgeland",
-          "Eucalypt Woodland", 
-          "Eucalypt Woodland",
-          "Eucalypt Open Forest", 
-          "Eucalypt Open Forest",
-          "Dry Rainforest")
-)
-
-```
-
-### Apply recode to raster
-
-```{r}
-
-lvls <- levels(landcover_rast)[[1]]                 # data.frame: ID, Veg_class
-
-# left join: recode_df only covers classes seen at pig locations, but the
-# raster covers the whole study area, so classes absent from recode_df$old
-# would otherwise be dropped (and turn into NA) rather than passed through
-lvls <- merge(lvls, recode_df, by.x = "Veg_class", by.y = "old",
-              all.x = TRUE, sort = FALSE)
-
-lvls$new[is.na(lvls$new)] <- lvls$Veg_class[is.na(lvls$new)]
-
-landcover_rast_merged <- deepcopy(landcover_rast)
-levels(landcover_rast_merged) <- data.frame(ID = lvls$ID, Veg_class = lvls$new)
-landcover_rast_merged <- droplevels(landcover_rast_merged)  # collapses duplicate labels into shared levels
-
-freq(landcover_rast_merged)   # check the merge worked as expected
-plot(landcover_rast_merged)
-
-```
-
-### Create dummy variables for each landcover type
-
-```{r}
-
-# segregate() expands the categorical raster into one 0/1 layer per class
-landcover_dummy <- segregate(landcover_rast_merged, other = 0)
-
-# segregate() names the layers by the integer category ID, so map them back to
-# the class names, as snake_case so they work as covariate names downstream
-names(landcover_dummy) <- lc_levels$Veg_class[
-  match(as.integer(names(landcover_dummy)), lc_levels$ID)] %>%
-  str_to_lower() %>%
-  str_replace_all("[^a-z0-9]+", "_") %>%
-  paste0("veg_", .)
-
-landcover_dummy
-
-# maxnl defaults to 16, so set it explicitly or the last few classes are dropped
-plot(landcover_dummy, col = c("grey90", "darkgreen"), legend = FALSE,
-     maxnl = nlyr(landcover_dummy), axes = FALSE,
-     mar = c(1.5, 1.5, 2, 1.5))
-
-```
-
-# Extract landcover values at the pig locations
-
-```{r}
-
-covariate_vals <- terra::extract(
-  c(ndvi,
-    ndwi,
-    ndmi,
-    landcover_rast_merged,
-    landcover_dummy), 
-  matrix(c(pig_all_steps$x2_, pig_all_steps$y2_), ncol = 2))
-  
-pig_all_steps_covs <- bind_cols(pig_all_steps, covariate_vals) 
-
-# write to file - check that date in the filename matches the data imported at the start of the script
-write_csv(pig_all_steps_covs, "data/pig_all_steps_covs_20261015.csv") 
-
-```
-
-### Check landcover frequency in the data after recoding
-
-```{r}
-
-pig_all_steps_covs %>% 
-  ggplot() +
-  geom_bar(aes(y = Veg_class, fill = Veg_class)) +
-  # scale_fill_viridis_d() +
-  scale_y_discrete("Vegetation Class") +
-  scale_x_continuous("Pig GPS locations") +
-  theme_bw() +
-  theme(legend.position = "none")
-
-```
-
-### Plot as sf again
-
-```{r}
-
-ggplot() +
-  geom_sf(data = landcover_cropped, aes(fill = Veg_class), colour = NA) +
-  geom_sf(data = pig_all_steps_sf, 
-          colour = "black", size = 0.1, alpha = 0.1) + #aes(colour = name), 
-  coord_sf() +
-  scale_colour_viridis_d() +
-  theme_bw() +
-  theme(legend.position = "right")
-
-# ggsave("outputs/east_alligator_landcover_combined.png",
-#        width = 250, height = 150, units = "mm", scale = 0.75, dpi = 600)
-
-```
-
-### Pull out water (with the NAs)
-
-```{r}
-
-plot(landcover_dummy[["veg_water"]])
-plot(is.na(landcover_dummy[["veg_water"]]))
-
-water_layer <- terra::subst(landcover_dummy[["veg_water"]], NA, 1)
-plot(water_layer)
-
-# terra::writeRaster(water_layer, "mapping/water_layer_kakadu.tif", overwrite = TRUE)
-
-```
-
-### Write the landcover variables to file
-
-```{r}
-
-# write out as a single multi-layer GeoTIFF; INT1U + DEFLATE keeps it small
-# writeRaster(landcover_dummy, "mapping/landcover_dummy_20m.tif",
-#             overwrite = TRUE,
-#             datatype = "INT1U",
-#             gdal = c("COMPRESS=DEFLATE", "PREDICTOR=2"))
-
-```
-
 # Assess selection of covariates through time
 
 ## Landcover variables
@@ -1115,19 +725,19 @@ plot(water_layer)
 
 ```{r}
 
-n_names <- n_distinct(pig_all_steps_covs$name)
+n_names <- n_distinct(pig_all_steps$name)
 viridis_cols <- viridisLite::viridis(n_names)
 
-pig_all_steps_covs %>% 
+pig_all_steps %>% 
   ggplot() +
   geom_smooth(aes(x = hour, y = veg_floodplain_sedgeland, colour = name, fill = name),
               alpha = 0.15,
               method = "gam", se = T) +
-  geom_smooth(data = pig_all_steps_covs %>% filter(season == "wet"),
+  geom_smooth(data = pig_all_steps %>% filter(season == "wet"),
               aes(x = hour, y = veg_floodplain_sedgeland),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "skyblue", colour = "skyblue") +
-  geom_smooth(data = pig_all_steps_covs %>% filter(season == "dry"),
+  geom_smooth(data = pig_all_steps %>% filter(season == "dry"),
               aes(x = hour, y = veg_floodplain_sedgeland),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "orange", colour = "orange") +
@@ -1148,12 +758,12 @@ ggsave("outputs/east_alligator_hourly_floodplain_sedgeland.png",
 
 ```{r}
 
-pig_all_steps_covs %>% 
+pig_all_steps %>% 
   ggplot() +
   geom_smooth(aes(x = t1_, y = veg_floodplain_sedgeland, colour = name, fill = name),
               alpha = 0.15,
               method = "gam", se = T) +
-  geom_smooth(data = pig_all_steps_covs, 
+  geom_smooth(data = pig_all_steps, 
               aes(x = t1_, y = veg_floodplain_sedgeland),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "red", colour = "red") +
@@ -1177,16 +787,16 @@ ggsave("outputs/east_alligator_daily_floodplain_sedgeland.png",
 
 ```{r}
 
-pig_all_steps_covs %>% 
+pig_all_steps %>% 
   ggplot() +
   geom_smooth(aes(x = hour, y = veg_eucalypt_woodland, colour = name, fill = name),
               alpha = 0.15,
               method = "gam", se = T) +
-  geom_smooth(data = pig_all_steps_covs %>% filter(season == "wet"),
+  geom_smooth(data = pig_all_steps %>% filter(season == "wet"),
               aes(x = hour, y = veg_eucalypt_woodland),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "skyblue", colour = "skyblue") +
-  geom_smooth(data = pig_all_steps_covs %>% filter(season == "dry"),
+  geom_smooth(data = pig_all_steps %>% filter(season == "dry"),
               aes(x = hour, y = veg_eucalypt_woodland),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "orange", colour = "orange") +
@@ -1207,12 +817,12 @@ ggsave("outputs/east_alligator_hourly_veg_eucalypt_woodland.png",
 
 ```{r}
 
-pig_all_steps_covs %>% 
+pig_all_steps %>% 
   ggplot() +
   geom_smooth(aes(x = t1_, y = veg_eucalypt_woodland, colour = name, fill = name),
               alpha = 0.15,
               method = "gam", se = T) +
-  geom_smooth(data = pig_all_steps_covs,
+  geom_smooth(data = pig_all_steps,
               aes(x = t1_, y = veg_eucalypt_woodland),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "red", colour = "red") +
@@ -1236,16 +846,16 @@ ggsave("outputs/east_alligator_daily_veg_eucalypt_woodland.png",
 
 ```{r}
 
-pig_all_steps_covs %>% 
+pig_all_steps %>% 
   ggplot() +
   geom_smooth(aes(x = hour, y = veg_eucalypt_open_forest, colour = name, fill = name),
               alpha = 0.15,
               method = "gam", se = T) +
-  geom_smooth(data = pig_all_steps_covs %>% filter(season == "wet"),
+  geom_smooth(data = pig_all_steps %>% filter(season == "wet"),
               aes(x = hour, y = veg_eucalypt_open_forest),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "skyblue", colour = "skyblue") +
-  geom_smooth(data = pig_all_steps_covs %>% filter(season == "dry"),
+  geom_smooth(data = pig_all_steps %>% filter(season == "dry"),
               aes(x = hour, y = veg_eucalypt_open_forest),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "orange", colour = "orange") +
@@ -1266,12 +876,12 @@ ggsave("outputs/east_alligator_hourly_veg_eucalypt_open_forest.png",
 
 ```{r}
 
-pig_all_steps_covs %>% 
+pig_all_steps %>% 
   ggplot() +
   geom_smooth(aes(x = t1_, y = veg_eucalypt_open_forest, colour = name, fill = name),
               alpha = 0.15,
               method = "gam", se = T) +
-  geom_smooth(data = pig_all_steps_covs,
+  geom_smooth(data = pig_all_steps,
               aes(x = t1_, y = veg_eucalypt_open_forest),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "red", colour = "red") +
@@ -1295,16 +905,16 @@ ggsave("outputs/east_alligator_daily_veg_eucalypt_open_forest.png",
 
 ```{r}
 
-pig_all_steps_covs %>% 
+pig_all_steps %>% 
   ggplot() +
   geom_smooth(aes(x = hour, y = veg_dry_rainforest, colour = name, fill = name),
               alpha = 0.15,
               method = "gam", se = T) +
-  geom_smooth(data = pig_all_steps_covs %>% filter(season == "wet"),
+  geom_smooth(data = pig_all_steps %>% filter(season == "wet"),
               aes(x = hour, y = veg_dry_rainforest),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "skyblue", colour = "skyblue") +
-  geom_smooth(data = pig_all_steps_covs %>% filter(season == "dry"),
+  geom_smooth(data = pig_all_steps %>% filter(season == "dry"),
               aes(x = hour, y = veg_dry_rainforest),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "orange", colour = "orange") +
@@ -1325,12 +935,12 @@ ggsave("outputs/east_alligator_hourly_veg_dry_rainforest.png",
 
 ```{r}
 
-pig_all_steps_covs %>% 
+pig_all_steps %>% 
   ggplot() +
   geom_smooth(aes(x = t1_, y = veg_dry_rainforest, colour = name, fill = name),
               alpha = 0.15,
               method = "gam", se = T) +
-  geom_smooth(data = pig_all_steps_covs,
+  geom_smooth(data = pig_all_steps,
               aes(x = t1_, y = veg_dry_rainforest),
               method = "gam", se = T,
               alpha = 0.5, linewidth = 2, fill = "red", colour = "red") +
@@ -1357,11 +967,11 @@ ggsave("outputs/east_alligator_daily_veg_dry_rainforest.png",
 
 # only plot the landcover types that occur at least 1000 times in the data
 present_veg_vars <- names(landcover_dummy)[
-  colSums(pig_all_steps_covs[names(landcover_dummy)], na.rm = TRUE) > 1000] 
+  colSums(pig_all_steps[names(landcover_dummy)], na.rm = TRUE) > 1000] 
 
 for (veg_var in present_veg_vars) {
 
-  p <- pig_all_steps_covs %>%
+  p <- pig_all_steps %>%
     filter(dt_hour < 0.75) %>% # keep the half-hour locations
     ggplot(aes(x = hour, y = .data[[veg_var]], colour = name, fill = name)) +
     geom_point(alpha = 0.1) +
@@ -1385,11 +995,11 @@ for (veg_var in present_veg_vars) {
 
 # only plot the landcover types that occur at least 1000 times in the data
 present_veg_vars <- names(landcover_dummy)[
-  colSums(pig_all_steps_covs[names(landcover_dummy)], na.rm = TRUE) > 1000] 
+  colSums(pig_all_steps[names(landcover_dummy)], na.rm = TRUE) > 1000] 
 
 for (veg_var in present_veg_vars) {
 
-  p <- pig_all_steps_covs %>%
+  p <- pig_all_steps %>%
     filter(dt_hour < 0.75) %>% # keep the half-hour locations
     ggplot(aes(x = t1_, y = .data[[veg_var]], colour = name, fill = name)) +
     geom_point(alpha = 0.1) +
@@ -1410,7 +1020,7 @@ for (veg_var in present_veg_vars) {
 
 ```{r}
 
-pig_all_steps_covs %>%
+pig_all_steps %>%
   filter(dt_hour < 0.75) %>% # keep the half-hour locations
   ggplot(aes(x = t1_, y = veg_floodplain_sedgeland, colour = name, fill = name)) +
   geom_point(alpha = 0.1) +
@@ -1428,7 +1038,7 @@ pig_all_steps_covs %>%
 
 ```{r}
 
-pig_all_steps_covs %>%
+pig_all_steps %>%
   filter(dt_hour < 0.75) %>% # keep the half-hour locations
   ggplot(aes(x = hour, y = NDVI, colour = name, fill = name)) +
   geom_point(alpha = 0.1) +
@@ -1445,7 +1055,7 @@ pig_all_steps_covs %>%
 
 ```{r}
 
-pig_all_steps_covs %>%
+pig_all_steps %>%
   filter(dt_hour < 0.75) %>% # keep the half-hour locations
   ggplot(aes(x = t1_, y = NDVI, colour = name, fill = name)) +
   geom_point(alpha = 0.1) +
@@ -1468,10 +1078,10 @@ Given there are two clusters in the data, subset to the one that has most of the
 
 ```{r}
 
-paste0("There are ", nrow(pig_all_steps_covs), " pig locations in the data.")
+paste0("There are ", nrow(pig_all_steps), " pig locations in the data.")
 
 # plot the data spatially coloured by ID
-pig_all_steps_covs %>%
+pig_all_steps %>%
   ggplot(aes(x = x1_, y = y1_, colour = name)) +
   geom_point(alpha = 0.5, size = 1) + 
   coord_fixed() +
@@ -1485,10 +1095,10 @@ pig_all_steps_covs %>%
 
 ```{r}
 
-pig_all_steps_covs_subset_sf <- pig_all_steps_covs %>%
+pig_all_steps_subset_sf <- pig_all_steps %>%
   st_as_sf(coords = c("x1_", "y1_"), crs = 3112)
 
-pig_subset_aoi <- st_bbox(pig_all_steps_covs_subset_sf) %>% 
+pig_subset_aoi <- st_bbox(pig_all_steps_subset_sf) %>% 
   st_as_sfc() %>% 
   st_buffer(dist = 2500) %>%
   st_bbox() %>% # the buffer creates curved corners so we need to get the bounding box of the buffered area
@@ -1497,7 +1107,7 @@ pig_subset_aoi <- st_bbox(pig_all_steps_covs_subset_sf) %>%
 # plot the data with the bounding box
 ggplot() +
   geom_sf(data = pig_subset_aoi) +
-  geom_point(data = pig_all_steps_covs,
+  geom_point(data = pig_all_steps,
              aes(x = x1_, y = y1_, colour = name),
              alpha = 0.5, size = 1) +
   coord_sf() +
@@ -1562,7 +1172,7 @@ writeRaster(slope_crop, "mapping/slope_3112_crop.tif", overwrite = TRUE)
 
 ```{r}
 
-pig_subset_2250_aoi <- st_bbox(pig_all_steps_covs_subset_sf) %>% 
+pig_subset_2250_aoi <- st_bbox(pig_all_steps_subset_sf) %>% 
   st_as_sfc() %>% 
   st_buffer(dist = 2250) %>%
   st_bbox() %>% # the buffer creates curved corners so we need to get the bounding box of the buffered area

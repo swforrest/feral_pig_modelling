@@ -1,0 +1,1079 @@
+---
+title: "Data Preparation"
+author: "Scott Forrest"
+date: "`r Sys.Date()`"
+execute: 
+  cache: false
+bibliography: paperpile.bib
+toc: true
+number-sections: false
+format: 
+  html:
+    # self-contained: true
+    code-fold: show
+    code-tools: true
+    df-print: paged
+    code-line-numbers: true
+    code-overflow: scroll
+    fig-format: png
+    fig-dpi: 300
+  pdf:
+    fig-format: png
+    fig-dpi: 300
+    geometry: 
+      - top=30mm
+      - left=30mm
+editor:
+  source
+abstract: |
+  Preparing feral pig GPS tracking data. 
+---
+
+# Load packages
+
+```{r}
+#| label: packages
+#| code-summary: "Load packages"
+#| message: false
+#| warning: false
+
+library(tidyverse)
+packages <- c("amt", "lubridate", 
+              "SDLfilter",
+              "terra", "suncalc",
+              "beepr", "tictoc")
+walk(packages, require, character.only = T)
+
+```
+
+# Import GPS tracking data
+
+```{r}
+#| label: import_data
+#| code-summary: "Import GPS tracking data"
+#| message: false
+#| warning: false
+
+pig_gps <- read_csv("data/KNP_GPS_101526_092931.CSV")
+
+min(pig_gps$`Date & Time [Local]`)
+
+unique(pig_gps$`Device ID`)
+
+pig_gps %>% arrange(`Device Name`)
+
+```
+
+# Clean data
+
+## Order the data and rename columns
+
+```{r}
+
+name_map <- c(
+  "159094" = "Duane",
+  "159096" = "Chief",
+  "158997" = "Miss Piggy",
+  "159086" = "Half Pint",
+  "159088" = "Razorback",
+  "159089" = "Johns",
+  "159003" = "Knocknee",
+  "159087" = "King David",
+  "159083" = "Unknown1",
+  "159091" = "Collingwood",
+  "159085" = "The Big Mann",
+  "159095" = "Doris",
+  "152648" = "Spot",
+  "152641" = "Brook",
+  "159005" = "Puncture",
+  "152638" = "Betty",
+  "159010" = "Isaac",
+  "152643" = "Dora the Explorer",
+  "159007" = "Bond",
+  "152646" = "Unknown2",
+  "159497" = "Big Bertha",
+  "159489" = "Mr Stinky",
+  "159491" = "Darren",
+  "159493" = "Porky",
+  "159496" = "Calvin",
+  "159490" = "Rosie",
+  "111"    = "Man Named Sue",
+  "159495" = "Andrew",
+  "159492" = "Harry",
+  "159494" = "Olivia"
+)
+
+pig_gps <- pig_gps %>%  
+  group_by(`Device Name`) %>% 
+  arrange(`Date & Time [Local]`, .by_group = T) %>% 
+  distinct(.keep_all = T) %>%
+  mutate(id = `Device ID`,
+         name = name_map[as.character(`Device ID`)],
+         `Date & Time [Local]` = with_tz(`Date & Time [GMT]`, tzone = "Australia/Darwin"), # i think it's already in Darwin time
+         # `Date & Time [Local]` = force_tz(`Date & Time [GMT]`, tzone = "Australia/Darwin"),
+         time = `Date & Time [Local]`,
+         lon = `Longitude`,
+         lat = `Latitude`,
+         n_sat = as.integer(str_extract(`Fix Status`, "\\d+(?= SV)")),
+         temp = `Temp [C]`) %>% 
+  drop_na() %>%
+  ungroup() 
+
+```
+
+## Update names from metadata 
+
+```{r}
+
+pig_gps_cols <- pig_gps %>% dplyr::select(id, name, time, lon, lat, n_sat, temp) 
+# attr(pig_gps_cols$time, "tzone") <- "Australia/Darwin"
+tz(pig_gps_cols$time)
+
+# view the data
+head(pig_gps_cols)
+
+pig_gps_ids <- unique(pig_gps_cols$id)
+
+```
+
+# GPS data cleaning
+
+We'll do a basic speed filter from @Shimada2012-tm. But, for some reason the function isn't working, so we'll do it manually below.
+
+```{r}
+
+pig_gps_cols %>% group_by(id) %>% 
+  summarise(n = n(),
+            start_time = min(time),
+            end_time = max(time),
+            duration = as.numeric(difftime(end_time, start_time, units = "days")))
+
+# # add a qi column for the number of satellites, and drop any rows with NA values
+# pig_gps_cols <-  pig_gps_cols %>% 
+#   mutate(DateTime = time,
+#          qi = n_sat) %>% 
+#   drop_na()
+# 
+# 
+# pig_vmax <- SDLfilter::vmax(pig_gps_cols, qi = 5, method = "sample", prob = 0.99)
+
+```
+
+## Setup trajectory
+
+Use the `amt` package to create a trajectory object from the cleaned data. 
+
+```{r}
+#| label: make_track
+#| code-summary: "Create a trajectory object"
+
+pig_all <- pig_gps_cols %>% mk_track(id = id,
+                                           lon,
+                                           lat, 
+                                           time, 
+                                           all_cols = T,
+                                           crs = 4326) %>% 
+  transform_coords(crs_to = 3112, crs_from = 4326) # Transformation to GDA94 / 
+# Geoscience Australia Lambert (https://epsg.io/3112)
+
+pig_all <- pig_all %>% arrange(id, t_)
+
+# plot the data spatially coloured by ID
+pig_all %>%
+  ggplot(aes(x = x_, y = y_, colour = name)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  coord_fixed() +
+  scale_colour_viridis_d() +
+  theme_classic()
+
+# coloured by the number of satellites
+pig_all %>% 
+  ggplot(aes(x = x_, y = y_, colour = n_sat)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  coord_fixed() +
+  scale_colour_viridis_c(direction = 1) +
+  theme_classic()
+
+```
+
+## Creating a step object 
+
+```{r}
+
+# nest the data by individual
+pig_all_nested <- pig_all %>% arrange(id) %>% nest(data = -"id")
+
+pig_all_nested_steps <- pig_all_nested %>%
+  mutate(steps = map(data, function(x)
+    x %>% track_resample(rate = minutes(30), tolerance = minutes(65)) %>%
+      steps_by_burst(keep_cols = "start")))
+
+# unnest the data after creating 'steps' objects
+pig_all_steps <- pig_all_nested_steps %>% 
+  amt::select(id, steps) %>% 
+  amt::unnest(cols = steps) %>% 
+  relocate(c(name, n_sat), .before = id) %>% 
+  mutate(dt_min = as.numeric(difftime(t2_, t1_, units = "mins")),
+         dt_hour = as.numeric(difftime(t2_, t1_, units = "hours"))) %>% 
+  filter(dt_min > 20)
+
+hist(as.numeric(pig_all_steps$dt_min))
+
+```
+
+## Calculate the speed for fixes > 5 satellites
+
+```{r}
+
+hist(pig_all_steps$n_sat)
+hist(pig_all_steps$sl_)
+
+pig_all_steps <- pig_all_steps %>% mutate(
+  speed = sl_ / as.numeric(difftime(t2_, t1_, units = "hours")) / 1000
+) 
+
+# unrealistic step lengths with all satellites
+pig_all_steps %>% 
+  ggplot(aes(x = speed)) +
+  geom_histogram(bins = 50) +
+  theme_classic()
+
+pig_all_steps %>% filter(n_sat > 5) %>% 
+  ggplot(aes(x = speed)) +
+  geom_histogram(bins = 50) +
+  theme_classic()
+
+```
+
+```{r}
+
+vmax <- pig_all_steps %>% filter(n_sat > 5) %>% 
+  # group_by(id) %>%
+  summarise(speed_95 = quantile(speed, 0.95, na.rm = T),
+            speed_999 = quantile(speed, 0.999, na.rm = T)
+            )
+
+pig_all_steps <- pig_all_steps %>% 
+  mutate(less_vmax = speed < vmax$speed_999)
+
+pig_all_steps <- pig_all_steps %>% filter(less_vmax) %>% 
+  select(-less_vmax) %>% 
+  arrange(id, t1_)
+  
+```
+
+## Plot after filtering
+
+```{r}
+
+# plot the data spatially coloured by ID
+pig_all_steps %>%
+  ggplot(aes(x = x1_, y = y1_, colour = name)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  coord_fixed() +
+  scale_colour_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+```
+
+## Export dataframe without covariates
+
+```{r}
+
+# set the name to match the input data frame
+write_csv(pig_all_steps, "data/pig_all_steps_20261015.csv")
+
+```
+
+# Add covariates
+
+## Time and season
+
+```{r}
+
+pig_all_steps <- pig_all_steps %>% 
+  mutate(
+    hour = hour(t1_) + minute(t1_)/60 + second(t1_)/3600,
+    hour_round = hour(t1_),date = as_date(t1_),
+    month = month(t1_),
+    season = case_when(month %in% c(11,12, 1, 2, 3, 4) ~ "wet",
+                       month %in% seq(5,10) ~ "dry"),
+    .after = dt_hour
+    )
+
+```
+
+### Plot the pig data
+
+```{r}
+
+# plot the data spatially coloured by ID
+pig_all_steps %>%
+  ggplot(aes(x = x1_, y = y1_, colour = name)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  coord_fixed() +
+  scale_colour_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+```
+
+### Plot with east alligator subset
+
+```{r}
+
+pig_all_steps %>% 
+  filter(x1_ > -170000) %>%
+  ggplot(aes(x = x1_, y = y1_, colour = name)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  coord_fixed() +
+  scale_colour_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+```
+
+## Crop to East Alligator region
+
+```{r}
+
+pig_all_steps <- pig_all_steps %>% filter(x1_ > -170000)
+paste0("There are ", nrow(pig_all_steps), " pig locations from ", length(unique(pig_all_steps$name)), " individuals in the subset.")
+
+```
+
+## Filter periods for some individuals
+
+Some pigs appear to drop their collars or die, so we'll trim those parts of the trajectories
+
+### Raw trajectories
+
+```{r}
+
+pig_ids <- unique(pig_all_steps$name)
+
+for(i in 1:length(pig_ids)) {
+
+  plot <- pig_all_steps %>% filter(name == pig_ids[i]) %>% 
+    ggplot(aes(x = t1_, y = sl_)) +
+    
+    geom_path() +
+    labs(title = paste0(pig_ids[i]),
+         x = "Time",
+         y = "Step length (m)") +
+    theme_bw()
+  
+  print(plot)
+  
+}
+
+```
+
+Betty, Brook, Unknown 1 and Doris all appear to go stationary. We'll find where they stop moving and filter out those parts.
+
+### Betty ~ 24th Feb 2026
+
+```{r}
+
+pig_all_steps %>% filter(name == "Betty" & 
+                           t1_ > lubridate::as_date("2026 02 22") &
+                           t1_ < lubridate::as_date("2026 03 01")
+                         ) %>% 
+  
+  ggplot(aes(x = t1_, y = sl_)) +
+  geom_path() +
+  labs(title = "Betty",
+       x = "Time",
+       y = "Step length (m)") +
+  theme_bw()
+
+```
+
+### Brook ~ 12th Feb 2026
+
+```{r}
+
+pig_all_steps %>% filter(name == "Brook" & 
+                           t1_ > lubridate::as_date("2026 02 08") &
+                           t1_ < lubridate::as_date("2026 02 15")
+                         ) %>% 
+  
+  ggplot(aes(x = t1_, y = sl_)) +
+  geom_path() +
+  labs(title = "Brook",
+       x = "Time",
+       y = "Step length (m)") +
+  theme_bw()
+
+```
+
+### Unknown1 ~ 30th April 2026 
+
+The jitter patterns appear to still have a daily cycle, so it might just be really restricted movement..? Keep for now.
+
+```{r}
+
+pig_all_steps %>% filter(name == "Unknown1" & 
+                           t1_ > lubridate::as_date("2026 04 25") &
+                           t1_ < lubridate::as_date("2026 05 05")
+                         ) %>% 
+  
+  ggplot(aes(x = t1_, y = sl_)) +
+  geom_path() +
+  labs(title = "Unknown1",
+       x = "Time",
+       y = "Step length (m)") +
+  theme_bw()
+
+```
+
+### Doris ~ 10th March 2026
+
+```{r}
+
+pig_all_steps %>% filter(name == "Doris" & 
+                           t1_ > lubridate::as_date("2026 03 05") &
+                           t1_ < lubridate::as_date("2026 03 15")
+                         ) %>% 
+  
+  ggplot(aes(x = t1_, y = sl_)) +
+  geom_path() +
+  labs(title = "Doris",
+       x = "Time",
+       y = "Step length (m)") +
+  theme_bw()
+
+```
+
+## Filter the data to remove those periods
+
+```{r}
+
+pig_all_steps <- pig_all_steps %>%
+  filter(
+    case_when(
+      name == "Betty" ~ t1_ < as.POSIXct("2026-02-24", tz = "Australia/Darwin"),
+      name == "Brook" ~ t1_ < as.POSIXct("2026-02-12", tz = "Australia/Darwin"),
+      name == "Doris" ~ t1_ < as.POSIXct("2026-03-10", tz = "Australia/Darwin"),
+      name == "Unknown1" ~ t1_ < as.POSIXct("2026-04-30", tz = "Australia/Darwin"),
+      .default = TRUE # this ensures that all the other data is kept
+    )
+  )
+
+```
+
+### Trimmed trajectories
+
+```{r}
+
+pig_ids <- unique(pig_all_steps$name)
+
+for(i in 1:length(pig_ids)) {
+
+  plot <- pig_all_steps %>% filter(name == pig_ids[i]) %>% 
+    ggplot(aes(x = t1_, y = sl_)) +
+    
+    geom_path() +
+    labs(title = paste0(pig_ids[i]),
+         x = "Time",
+         y = "Step length (m)") +
+    theme_bw()
+  
+  print(plot)
+  
+}
+
+```
+
+## Plot a timelime of the GPS data collection
+
+```{r}
+
+pig_all_steps %>% #filter(name != "Unknown1") %>% 
+  ggplot(aes(x = t1_, y = name, colour = name)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  scale_colour_viridis_d() +
+  theme_classic() +
+  labs(x = "Date", y = "Pig ID") +
+  theme(legend.position = "none") 
+
+ggsave("outputs/east_alligator_pig_timeline.png", 
+       width = 250, height = 150, units = "mm", scale = 0.75, dpi = 600)
+
+```
+
+## Create an sf object of the data
+
+```{r}
+
+# convert to an sf object (x1_/y1_ are in GDA94 / GA Lambert, EPSG:3112)
+# and reproject to WGS84 (EPSG:4326) for leaflet
+pig_all_steps_sf <- pig_all_steps %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>%
+  st_transform(crs = 4326)
+
+```
+
+## Create a bounding box around the pig data to crop the other layers by
+
+```{r}
+
+pig_all_steps_sf
+
+pig_aoi <- st_bbox(pig_all_steps_sf) %>% 
+  st_as_sfc() %>% 
+  st_transform(crs = 3112) %>% 
+  st_buffer(dist = 2500) %>%
+  st_bbox() %>% # the buffer creates curved corners so we need to get the bounding box of the buffered area
+  st_as_sfc()
+
+# save the bounding box as a shapefile
+pig_aoi %>% 
+  st_transform(crs = 4326) %>%
+  st_write("mapping/pig_aoi_wgs84.geojson", driver = "GeoJSON", delete_dsn = TRUE)
+
+```
+
+### Use the temperature to check the timezone 
+
+Assuming hotter during the middle hours.
+
+```{r}
+
+# by pig ID
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = temp, colour = name, fill = name)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "gam", se = T) +
+  scale_colour_viridis_d() +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  theme(legend.position = "none")
+
+# by the month of the year
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = temp, colour = as.factor(month), fill = as.factor(month))) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "gam", se = T) +
+  scale_colour_viridis_d("Month") +
+  scale_fill_viridis_d("Month") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+# by season
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = temp, colour = season, fill = season)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "gam", se = T) +
+  # scale_colour_viridis_d("Season") +
+  # scale_fill_viridis_d("Season") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+```
+
+# Get time as a deviation from sunrise and sunset
+
+```{r}
+
+# pig_all_steps_sf <- pig_all_steps %>%
+#   st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>% 
+#   st_transform(crs = 4326) 
+# 
+# # check lat/lon of the first point
+# pig_all_steps_sf$geometry %>% head(1)
+
+lat <- -12.1827   # first GPS location in data
+lon <- 132.6758
+
+sun <- suncalc::getSunlightTimes(
+  data = pig_all_steps %>% distinct(date) %>% mutate(lat = lat, lon = lon),
+  keep = c("sunrise", "sunset"),
+  tz = "Australia/Darwin"
+)
+
+pig_all_steps <- pig_all_steps %>%
+  left_join(sun %>% select(date, sunrise, sunset), by = "date") %>%
+  mutate(
+    time_since_sunrise = as.numeric(difftime(t1_, sunrise, units = "hours")),
+    time_until_sunset = as.numeric(difftime(sunset, t1_, units = "hours")),
+    day_fraction = as.numeric(difftime(t1_, sunrise, units = "hours")) /
+             as.numeric(difftime(sunset, sunrise, units = "hours"))
+    
+  )
+
+```
+
+## Check that it worked
+
+The `day_fraction` variable is 0 at sunrise and 1 at sunset. Values before sunrise are negative and values after sunset are greater than 1.
+
+```{r}
+
+pig_all_steps %>% 
+  ggplot(aes(x = hour, y = day_fraction)) +
+  geom_hline(yintercept = c(0,1), colour = "black", linetype = "dashed") +
+  geom_point(alpha = 0.1) +
+  scale_y_continuous("Time since sunrise (hours)") +
+  scale_x_continuous("Hour of the day", breaks = seq(0, 24, by = 2)) +
+  theme_bw()
+
+```
+
+# Add meteorological data
+
+```{r}
+
+max_temp <- dplyr::bind_rows(read_csv("data/weather/MaxTemp_IDCJAC0010_014310_2025_Data.csv"), 
+                             read_csv("data/weather/MaxTemp_IDCJAC0010_014310_2026_Data.csv")) %>% 
+  dplyr::select(-c(`Product code`, `Days of accumulation of maximum temperature`, Quality)) %>% 
+  dplyr::rename("BOM_station" = `Bureau of Meteorology station number`,
+                "max_temp" = `Maximum temperature (Degree C)`)
+
+min_temp <- dplyr::bind_rows(read_csv("data/weather/MinTemp_IDCJAC0011_014310_2025_Data.csv"), 
+                             read_csv("data/weather/MinTemp_IDCJAC0011_014310_2026_Data.csv")) %>% 
+  dplyr::select(-c(`Product code`, `Days of accumulation of minimum temperature`, Quality)) %>% 
+  dplyr::rename("BOM_station" = `Bureau of Meteorology station number`,
+                "min_temp" = `Minimum temperature (Degree C)`)
+
+rainfall <- dplyr::bind_rows(read_csv("data/weather/Rainfall_IDCJAC0009_014310_2025_Data.csv"), 
+                             read_csv("data/weather/Rainfall_IDCJAC0009_014310_2026_Data.csv")) %>% 
+  dplyr::select(-c(`Product code`, `Period over which rainfall was measured (days)`, Quality)) %>% 
+  dplyr::rename("BOM_station" = `Bureau of Meteorology station number`,
+                "rainfall" = `Rainfall amount (millimetres)`)
+
+solar_exposure <- dplyr::bind_rows(read_csv("data/weather/SolarExp_IDCJAC0016_014310_2025_Data.csv"), 
+                                   read_csv("data/weather/SolarExp_IDCJAC0016_014310_2026_Data.csv")) %>% 
+  dplyr::select(-`Product code`) %>% 
+  dplyr::rename("BOM_station" = `Bureau of Meteorology station number`,
+                "solar_exp" = `Daily global solar exposure (MJ/m*m)`)
+
+weather_data <- dplyr::left_join(max_temp, min_temp) %>%
+  dplyr::left_join(rainfall) %>%
+  dplyr::left_join(solar_exposure) %>%
+  mutate(Date = make_date(Year, as.integer(Month), as.integer(Day)),
+         .after = Day) 
+
+```
+
+## Join with the pig GPS data
+
+```{r}
+
+pig_all_steps <- dplyr::left_join(pig_all_steps, weather_data, by = c("date" = "Date")) 
+
+```
+
+# Import environmental data
+
+## Sentinel-2 data
+
+```{r}
+
+s2 <- rast("mapping/feral_pig_aoi_S2_median_full_2025-09-12_to_2026-06-23.tif")
+# plot(s2)
+
+```
+
+## NDVI, NDWI and NDMI data
+
+```{r}
+
+s2_indices <- rast("mapping/feral_pig_aoi_S2_indices_2025-09-12_to_2026-06-23.tif")
+plot(s2_indices)
+
+s2_indices_crop <- crop(s2_indices, pig_aoi)
+
+ndvi <- s2_indices_crop$NDVI / 10000
+ndwi <- s2_indices_crop$NDWI / 10000
+ndmi <- s2_indices_crop$NDMI / 10000
+
+plot(ndvi)
+plot(ndwi)
+plot(ndmi)
+
+```
+
+## AlphaEarth embeddings
+
+```{r}
+
+# alpha_earth_1 <- rast("mapping/feral_pig_aoi_alphaearth_2025-0000000000-0000000000.tif")
+# plot(alpha_earth_1)
+# alpha_earth_2 <- rast("mapping/feral_pig_aoi_alphaearth_2025-0000000000-0000003072.tif")
+# plot(alpha_earth_2)
+
+```
+
+## Elevation data
+
+```{r}
+
+elevation <- rast("mapping/DEM.tif")
+plot(elevation)
+
+elevation_proj <- terra::project(elevation, "EPSG:3112")
+
+# align with the S2 indices
+elevation_aligned <- terra::resample(elevation_proj, s2_indices_crop, method = "bilinear")
+plot(elevation_aligned)
+
+writeRaster(elevation_aligned, "mapping/DEM_east_alligator_3112.tif", overwrite = TRUE)
+
+```
+
+## Slope
+
+```{r}
+
+slope <- terrain(elevation_aligned, "slope", unit = "degrees")
+plot(slope)
+
+writeRaster(slope, "mapping/slope_east_alligator_3112.tif", overwrite = TRUE)
+
+```
+
+## Landcover data
+
+```{r}
+
+# Import shapefile of landcover data using sf
+landcover <- st_read("mapping/VegTypes_CDU2025.shp")
+landcover
+
+# Import shapefile of landcover data using terra
+# landcover <- vect("mapping/VegTypes_CDU2025.shp")
+
+```
+
+### Crop the landcover data
+
+```{r}
+
+landcover_cropped <- landcover %>% 
+  st_transform(crs = 3112) %>% 
+  st_crop(pig_aoi) 
+
+```
+
+### Plot the landcover data
+
+```{r}
+
+ggplot() +
+  geom_sf(data = landcover_cropped, aes(fill = Veg_class), colour = NA) + 
+  geom_sf(data = pig_all_steps_sf, aes(colour = season),
+          size = 0.1) + #aes(colour = name), colour = "black", , alpha = 0.1
+  coord_sf() +
+  scale_fill_viridis_d("Vegetation Class") + #option = "H"
+  scale_colour_manual(
+    "Season",
+    values = c("wet" = "skyblue", "dry" = "orange"),
+    labels = c("wet" = "Wet season", "dry" = "Dry season")) +
+  theme_bw() + 
+  theme(legend.position = "right") 
+
+ggsave("outputs/east_alligator_landcover.png",
+       width = 260, height = 150, units = "mm", scale = 1.1, dpi = 600)
+
+```
+
+### How many landcover types are there?
+
+```{r}
+
+unique(landcover_cropped$Veg_class)
+length(unique(landcover_cropped$Veg_class))
+
+```
+
+### Create landcover raster layers for each landcover type
+
+One binary (0/1) layer per vegetation class, on the same grid as the Sentinel-2
+exports so that all of the covariates stack without any resampling.
+
+```{r}
+
+# Use the ndvi layer as the template grid (20 m, EPSG:3112) so the
+# landcover layers line up cell-for-cell with the remotely sensed covariates
+lc_template <- deepcopy(ndvi)
+lc_template[] <- NA # keep the geometry, drop the values
+
+# Rasterise the polygons; a character field gives a categorical raster, where
+# the levels table maps the integer cell values back to the class names
+landcover_rast <- rasterize(vect(landcover_cropped), lc_template,
+                            field = "Veg_class")
+plot(landcover_rast)
+lc_levels <- levels(landcover_rast)[[1]]
+
+```
+
+### What frequency do they occur in the data?
+
+```{r}
+
+landcover_vals <- terra::extract(landcover_rast, matrix(c(pig_all_steps$x2_, pig_all_steps$y2_), ncol = 2))
+pig_all_steps_covs <- bind_cols(pig_all_steps, landcover_vals) 
+
+# pig_all_steps_covs %>% 
+#   ggplot() +
+#   geom_bar(aes(y = Veg_class, fill = season),
+#            colour = "black",
+#            position = "dodge") +
+#   scale_fill_manual(
+#     "Season",
+#     values = c("wet" = "skyblue", "dry" = "orange"),
+#     labels = c("wet" = "Wet season", "dry" = "Dry season")) +
+#   scale_y_discrete("Vegetation Class") +
+#   scale_x_continuous("Pig GPS locations") +
+#   theme_bw() +
+#   theme(legend.position = "none")
+
+pig_all_steps_covs %>%
+  count(Veg_class, season) %>%
+  group_by(season) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup() %>%
+  ggplot(aes(y = Veg_class, x = prop, fill = season)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7,
+           colour = "black") +
+  scale_fill_manual(
+    "Season",
+    values = c("wet" = "skyblue", "dry" = "orange"),
+    labels = c("wet" = "Wet season", "dry" = "Dry season")) +
+  scale_y_discrete("Vegetation Class") +
+  scale_x_continuous("Proportion of season's locations", labels = scales::percent) +
+  theme_bw() +
+  theme(
+    legend.position = "inside",
+    legend.position.inside = c(0.95, 0.95),
+    legend.justification = c("right", "top"),
+    legend.background = element_rect(fill = alpha("white", 0.7), colour = NA)
+  )
+
+ggsave("outputs/east_alligator_habitat_use_seasonal.png",
+       width = 260, height = 150, units = "mm", scale = 0.75, dpi = 1000)
+
+```
+
+### Recode based on their frequency in the data
+
+```{r}
+
+recode_df <- data.frame(
+  
+  old = c("Bare Ground",
+          "Wet Rainforest Springfed", 
+          "Water", 
+          "Mudflat",
+          "Melaleuca Woodland", 
+          "Melaleuca Open Woodland",
+          "Melaleuca Open Forest", 
+          "Melaleuca Closed Forest",
+          "Mangrove", 
+          "Grassland",
+          "Floodplain Sedgeland",
+          "Eucalypt Woodland", 
+          "Eucalypt Open Woodland",
+          "Eucalypt Open Forest", 
+          "Eucalypt Closed Forest",
+          "Dry Rainforest",
+          "Seasonally Inundated Treeless Swamp",
+          "Wet Rainforest Riparian"),
+  
+  new = c("Mudflat",
+          "Dry Rainforest", 
+          "Water", 
+          "Mudflat",
+          "Melaleuca Woodland", 
+          "Melaleuca Woodland",
+          "Melaleuca Open Forest", 
+          "Melaleuca Closed Forest",
+          "Mangrove", 
+          "Floodplain Sedgeland",
+          "Floodplain Sedgeland",
+          "Eucalypt Woodland", 
+          "Eucalypt Woodland",
+          "Eucalypt Open Forest", 
+          "Eucalypt Open Forest",
+          "Dry Rainforest",
+          "Floodplain Sedgeland",
+          "Dry Rainforest")
+)
+
+```
+
+### Apply recode to raster
+
+```{r}
+
+lvls <- levels(landcover_rast)[[1]]
+lvls <- merge(lvls, recode_df, by.x = "Veg_class", by.y = "old",
+              all.x = TRUE, sort = FALSE)
+
+# check that all the old classes have been recoded to a new class
+lvls$new[is.na(lvls$new)] <- lvls$Veg_class[is.na(lvls$new)]
+
+# one new ID per unique merged label
+new_lab <- unique(lvls$new)
+new_id  <- match(lvls$new, new_lab)
+
+# strip the old categories, then substitute old ID -> new ID
+r_num <- terra::deepcopy(landcover_rast)
+levels(r_num) <- NULL
+landcover_rast_merged <- terra::classify(r_num, cbind(lvls$ID, new_id))
+
+# attach the merged labels
+levels(landcover_rast_merged) <- data.frame(ID = seq_along(new_lab),
+                                            Veg_class = new_lab)
+
+freq(landcover_rast_merged)   # each name should now appear once
+plot(landcover_rast_merged)
+
+```
+
+### Create dummy variables for each landcover type
+
+```{r}
+
+lc_merged_levels <- levels(landcover_rast_merged)[[1]]
+
+# segregate() expands the categorical raster into one 0/1 layer per class
+landcover_dummy <- terra::segregate(landcover_rast_merged, other = 0)
+
+# segregate() names the layers by the integer category ID, so map them back to
+# the class names, as snake_case so they work as covariate names downstream
+names(landcover_dummy) <- lc_merged_levels$Veg_class[
+  match(as.integer(names(landcover_dummy)), lc_merged_levels$ID)] %>%
+  str_to_lower() %>%
+  str_replace_all("[^a-z0-9]+", "_") %>%
+  paste0("veg_", .)
+
+landcover_dummy
+
+# maxnl defaults to 16, so set it explicitly or the last few classes are dropped
+plot(landcover_dummy, col = c("grey90", "darkgreen"), legend = FALSE,
+     maxnl = nlyr(landcover_dummy), axes = FALSE,
+     mar = c(1.5, 1.5, 2, 1.5))
+
+```
+
+## Extract landcover values at the pig locations
+
+```{r}
+
+covariate_vals <- terra::extract(
+  c(ndvi,
+    ndwi,
+    ndmi,
+    landcover_rast_merged,
+    landcover_dummy), 
+  matrix(c(pig_all_steps$x2_, pig_all_steps$y2_), ncol = 2))
+  
+pig_all_steps_covs <- bind_cols(pig_all_steps, covariate_vals) 
+
+```
+
+### Check landcover frequency in the data after recoding
+
+```{r}
+
+pig_all_steps_covs %>% 
+  ggplot() +
+  geom_bar(aes(y = Veg_class, fill = Veg_class)) +
+  # scale_fill_viridis_d() +
+  scale_y_discrete("Vegetation Class") +
+  scale_x_continuous("Pig GPS locations") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+### Plot the vegetation classes with the data
+
+```{r}
+
+landcover_rast_merged_df <- as.data.frame(landcover_rast_merged,
+                                          xy = TRUE, na.rm = TRUE)
+
+ggplot() +
+  geom_raster(data = landcover_rast_merged_df, 
+              aes(x=x, y=y, fill = Veg_class)) +
+  coord_sf() +
+  scale_fill_viridis_d("Vegetation") +
+  scale_colour_manual(
+    "Season",
+    values = c("wet" = "skyblue", "dry" = "orange"),
+    labels = c("wet" = "Wet season", "dry" = "Dry season")) +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave("outputs/east_alligator_landcover_combined.png",
+       width = 250, height = 150, units = "mm", scale = 1, dpi = 600)
+
+ggplot() +
+  geom_raster(data = landcover_rast_merged_df, 
+              aes(x=x, y=y, fill = Veg_class)) +
+  geom_point(data = pig_all_steps,
+          aes(x = x1_, y = y1_, colour = season),
+          size = 0.1, alpha = 0.25) + 
+  coord_sf() +
+  scale_fill_viridis_d("Vegetation") +
+  scale_colour_manual(
+    "Season",
+    values = c("wet" = "skyblue", "dry" = "orange"),
+    labels = c("wet" = "Wet season", "dry" = "Dry season")) +
+  guides(colour = guide_legend(override.aes = list(size = 2, alpha = 1))) +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave("outputs/east_alligator_landcover_combined_wGPS.png",
+       width = 250, height = 150, units = "mm", scale = 1, dpi = 600)
+
+```
+
+## Save the landcover raster layer
+
+```{r}
+
+terra::writeRaster(landcover_rast_merged, "mapping/landcover_east_alligator.tif", overwrite = TRUE)
+
+```
+
+
+### Pull out water (with the NAs)
+
+```{r}
+
+plot(landcover_dummy[["veg_water"]])
+plot(is.na(landcover_dummy[["veg_water"]]))
+
+water_layer <- terra::subst(landcover_dummy[["veg_water"]], NA, 1)
+plot(water_layer)
+
+terra::writeRaster(water_layer, "mapping/water_layer_east_alligator.tif", overwrite = TRUE)
+
+```
+
+## Write dataframe with covariates as csv
+
+```{r}
+
+# write to file - check that date in the filename matches the data imported at the start of the script
+write_csv(pig_all_steps_covs, "data/pigs_east_alligator_steps_covs_20261015.csv") 
+
+```
+
+# References
+
+::: {#refs}
+:::
+
+# Session Information
+
+```{r}
+
+utils::sessionInfo()
+
+```
