@@ -1,0 +1,24 @@
+project:
+  type: website
+  output-dir: docs
+  
+freeze: auto # re-render only when source changes
+
+website:
+  title: "Kakadu Pig Modelling"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - about.qmd
+
+format:
+  html:
+    theme:
+      - cosmo
+      - brand
+    css: styles.css
+    toc: true
+
+
+
