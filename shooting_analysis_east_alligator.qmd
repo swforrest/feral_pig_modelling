@@ -5,6 +5,7 @@ author: "Scott Forrest"
 date: "`r Sys.Date()`"
 execute: 
   cache: false
+  warning: false
 bibliography: paperpile.bib
 toc: true
 number-sections: false
@@ -28,14 +29,15 @@ format:
 editor:
   source
 abstract: |
-  Looking into the movement data of feral pigs.
+  Here we are looking at how feral pigs respond to aerial shooting operations in the East Alligator region of Kakadu National Park, Northern Territory, Australia. We have GPS tracking data from pigs in the area, and we are looking at how their movement patterns change before and after shooting events. Because the pig's behaviour is temporally variable, we also need to ensure that the timing of the shooting operations isn't correlated with ordinary behavioural changes (which it seems to be). Therefore, as a control, we also run the same analyses on data at the same time of day, but 3 days before shooting occurred, and as an additional control, for pigs that were outside the area shooting was occurring.
+  
+  We look at changes in their movement behaviour, measured as the distance between successive GPS fixes (step length), as well as their habitat use, measured as the proportion of time they spend in different vegetation classes.
 ---
 
 # Load packages
 
 ```{r}
 #| label: packages
-#| code-summary: "Load packages"
 #| message: false
 #| warning: false
 
@@ -45,6 +47,20 @@ packages <- c("amt", "lubridate",
               "beepr", "tictoc",
               "leaflet", "tidyterra")
 walk(packages, require, character.only = T)
+
+```
+
+# Create directories for outputs
+
+```{r}
+
+# general outputs directory
+outputs_dir <- "outputs/east_alligator/shooting_responses/"
+dir.create(outputs_dir, showWarnings = FALSE, recursive = TRUE)
+
+# for plots with veg categories
+outputs_veg_dir <- file.path(outputs_dir, "veg/")
+dir.create(outputs_veg_dir, showWarnings = FALSE, recursive = TRUE)
 
 ```
 
@@ -60,174 +76,6 @@ pig_all_steps <- pig_all_steps %>%
     t1_  = with_tz(t1_, tzone = "Australia/Darwin"),
     t2_ = with_tz(t2_, tzone = "Australia/Darwin")
     )
-
-```
-
-## Crop to East Alligator region
-
-```{r}
-
-pig_all_steps <- pig_all_steps %>% filter(x1_ > -170000)
-paste0("There are ", nrow(pig_all_steps), " pig locations from ", length(unique(pig_all_steps$name)), " individuals in the subset.")
-
-```
-
-## Filter periods for some individuals
-
-Some pigs appear to drop their collars or die, so we'll trim those parts of the trajectories
-
-### Raw trajectories
-
-```{r}
-
-pig_ids <- unique(pig_all_steps$name)
-
-for(i in 1:length(pig_ids)) {
-
-  plot <- pig_all_steps %>% filter(name == pig_ids[i]) %>% 
-    ggplot(aes(x = t1_, y = sl_)) +
-    
-    geom_path() +
-    labs(title = paste0(pig_ids[i]),
-         x = "Time",
-         y = "Step length (m)") +
-    theme_bw()
-  
-  print(plot)
-  
-}
-
-```
-
-Betty, Brook, Unknown 1 and Doris all appear to go stationary. We'll find where they stop moving and filter out those parts.
-
-### Betty ~ 24th Feb 2026
-
-```{r}
-
-pig_all_steps %>% filter(name == "Betty" & 
-                           t1_ > lubridate::as_date("2026 02 22") &
-                           t1_ < lubridate::as_date("2026 03 01")
-                         ) %>% 
-  
-  ggplot(aes(x = t1_, y = sl_)) +
-  geom_path() +
-  labs(title = "Betty",
-       x = "Time",
-       y = "Step length (m)") +
-  theme_bw()
-
-```
-
-### Brook ~ 12th Feb 2026
-
-```{r}
-
-pig_all_steps %>% filter(name == "Brook" & 
-                           t1_ > lubridate::as_date("2026 02 08") &
-                           t1_ < lubridate::as_date("2026 02 15")
-                         ) %>% 
-  
-  ggplot(aes(x = t1_, y = sl_)) +
-  geom_path() +
-  labs(title = "Brook",
-       x = "Time",
-       y = "Step length (m)") +
-  theme_bw()
-
-```
-
-### Unknown1 ~ maybe actually still has collar? 
-
-The jitter patterns appear to still have a daily cycle, so it might just be really restricted movement..? Keep for now.
-
-```{r}
-
-pig_all_steps %>% filter(name == "Unknown1" & 
-                           t1_ > lubridate::as_date("2026 03 08") &
-                           t1_ < lubridate::as_date("2026 07 25")
-                         ) %>% 
-  
-  ggplot(aes(x = t1_, y = sl_)) +
-  geom_path() +
-  labs(title = "Unknown1",
-       x = "Time",
-       y = "Step length (m)") +
-  theme_bw()
-
-```
-
-### Doris ~ 10th March 2026
-
-```{r}
-
-pig_all_steps %>% filter(name == "Doris" & 
-                           t1_ > lubridate::as_date("2026 03 05") &
-                           t1_ < lubridate::as_date("2026 03 15")
-                         ) %>% 
-  
-  ggplot(aes(x = t1_, y = sl_)) +
-  geom_path() +
-  labs(title = "Doris",
-       x = "Time",
-       y = "Step length (m)") +
-  theme_bw()
-
-```
-
-## Filter the data to remove those periods
-
-```{r}
-
-pig_all_steps <- pig_all_steps %>%
-  filter(
-    case_when(
-      name == "Betty" ~ t1_ < as.POSIXct("2026-02-24", tz = "Australia/Darwin"),
-      name == "Brook" ~ t1_ < as.POSIXct("2026-02-12", tz = "Australia/Darwin"),
-      name == "Doris" ~ t1_ < as.POSIXct("2026-03-10", tz = "Australia/Darwin"),
-      .default = TRUE # this ensures that all the other data is kept
-    )
-  )
-
-```
-
-### Trimmed trajectories
-
-```{r}
-
-pig_ids <- unique(pig_all_steps$name)
-
-for(i in 1:length(pig_ids)) {
-
-  plot <- pig_all_steps %>% filter(name == pig_ids[i]) %>% 
-    ggplot(aes(x = t1_, y = sl_)) +
-    
-    geom_path() +
-    labs(title = paste0(pig_ids[i]),
-         x = "Time",
-         y = "Step length (m)") +
-    theme_bw()
-  
-  print(plot)
-  
-}
-
-```
-
-## Plot a timelime of the GPS data collection
-
-```{r}
-
-pig_all_steps %>% #filter(name != "Unknown1") %>% 
-  ggplot(aes(x = t1_, y = name, colour = name)) +
-  geom_point(alpha = 0.5, size = 1) + 
-  scale_colour_viridis_d() +
-  theme_classic() +
-  labs(x = "Date", y = "Pig ID") +
-  theme(legend.position = "none") 
-
-ggsave("outputs/east_alligator_pig_timeline.png", 
-       width = 250, height = 150, units = "mm", scale = 0.75, dpi = 600)
 
 ```
 
@@ -261,21 +109,21 @@ pig_aoi <- st_bbox(pig_all_steps_sf) %>%
 
 ```
 
-# Import shooting data
+# Shooting data
+
+## Import shooting data from late 2025
+
+In the region where we have pig GPS tracking data, there are two main shooting events. 
 
 ```{r}
 
-# Import shapefile of shooting locations using sf - most of the data is actually from 2025
+# Import shapefile of shooting locations using sf - most of the data in East Alligator is actually from late 2025
 shooting_locations_2025 <- st_read("mapping/pig_shooting_2026.shp")
-
-st_crs(shooting_locations_2025)
-
-# Import shapefile of shooting locations using terra
-# shooting_locations <- vect("mapping/pig_shooting_2026.shp")
+# st_crs(shooting_locations_2025)
 
 ```
 
-## Import data from 2026
+## Import shooting data from 2026
 
 ```{r}
 
@@ -287,15 +135,16 @@ shooting_locations_2026 <- shooting_locations_2026 %>%
 
 ```
 
+## Plot all of the shooting locations
 
-## Plot the shooting locations
+The late 2025 shooting operations are in red, and the 2026 shooting operations are in blue. The pig GPS locations are coloured by individual.
 
 ```{r}
 
 ggplot() +
   geom_sf(data = pig_all_steps_sf, aes(colour = name), size = 0.1, alpha = 0.1) +
-  geom_sf(data = shooting_locations_2025, colour = "red", size = 0.5) +
-  geom_sf(data = shooting_locations_2026, colour = "blue", size = 0.5) +
+  geom_sf(data = shooting_locations_2025, colour = "red", alpha = 0.5, size = 0.5) +
+  geom_sf(data = shooting_locations_2026, colour = "blue", alpha = 0.5, size = 0.5) +
   coord_sf() +
   theme_bw() +
   theme(legend.position = "none")
@@ -314,19 +163,21 @@ shooting_locations_2025_clean <- shooting_locations_2025_clean %>% dplyr::rename
 # keep relevant columns
 shooting_locations_2026_clean <- shooting_locations_2026 %>% dplyr::select(Time, FeralSpecies, NumberShot, NumberObserved)
 
+# combine the two datasets
 shooting_locations <- bind_rows(shooting_locations_2025_clean, shooting_locations_2026_clean)
 
 ```
 
-
-### Crop the shooting locations
+## Crop the shooting locations to the extent of the pig GPS locations
 
 ```{r}
 
+# crop to the extent of the pig GPS locations
 filtered_shooting_locations <- shooting_locations %>% 
   st_transform(crs = 3112) %>% 
   st_crop(pig_aoi)
 
+# plot
 ggplot() +
   geom_sf(data = pig_all_steps_sf, aes(colour = name), size = 0.1, alpha = 0.1) +
   geom_sf(data = filtered_shooting_locations, colour = "red", size = 0.5) +
@@ -334,14 +185,11 @@ ggplot() +
   theme_bw() +
   theme(legend.position = "none")
 
-min(filtered_shooting_locations$Date)
-max(filtered_shooting_locations$Date)
-
 ```
 
-# Overlap between shooting and pig GPS locations
+# Overlap between shooting locations and pig GPS locations
 
-### Ensure the timezones match
+## Ensure the timezones match
 
 ```{r}
 
@@ -357,8 +205,69 @@ filtered_shooting_locations <- filtered_shooting_locations %>% mutate(
 # check the timezone of the shooting locations
 tz(filtered_shooting_locations$shoot_time)
 
+# temporal range of the shooting data
 min(filtered_shooting_locations$shoot_time)
 max(filtered_shooting_locations$shoot_time)
+
+```
+
+## Shooting locations through time
+
+```{r}
+
+ggplot() +
+  geom_sf(data = filtered_shooting_locations, aes(colour = shoot_time), size = 0.5) +
+  coord_sf() +
+  labs(colour = "Shooting\ntime") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+```
+
+## Timeline of the GPS data collection
+
+```{r}
+
+ggplot() +
+  geom_vline(xintercept = filtered_shooting_locations$shoot_time, 
+             colour = "red", linetype = "dashed", linewidth = 0.25) +
+  geom_point(data = pig_all_steps,
+             aes(x = t1_, y = name, colour = name),
+             alpha = 0.5, size = 1) + 
+  scale_colour_viridis_d() +
+  theme_classic() +
+  labs(x = "Date", y = "Pig GPS tracking data") +
+  theme(legend.position = "none") 
+
+ggsave(paste0(outputs_dir, "pig_shoot_timeline.png"), 
+       width = 250, height = 150, units = "mm", scale = 0.75, dpi = 600)
+
+```
+
+### Hours of shooting
+
+```{r}
+
+filtered_shooting_locations <- filtered_shooting_locations %>% 
+  mutate(
+    shoot_hms = lubridate::hour(shoot_time) + lubridate::minute(shoot_time)/60 + lubridate::second(shoot_time)/3600
+  ) 
+
+filtered_shooting_locations %>%
+  ggplot() +
+  geom_histogram(aes(x = shoot_hms), bins = 50, fill = "red", colour = "black") +
+  scale_x_datetime("Shooting time") +
+  theme_bw()
+
+```
+
+### Ensure both objects are in the same coordinate reference system (CRS)
+
+```{r}
+
+# Update pig GPS locations to match the CRS of the shooting locations
+pig_all_steps_sf <- st_transform(pig_all_steps_sf, st_crs(filtered_shooting_locations))
+st_crs(pig_all_steps_sf)$input
 
 ```
 
@@ -376,8 +285,9 @@ filtered_shooting_locations %>%
 
 ```
 
-
 ## Use leaflet to plot the data
+
+Here we create a plot that can animate the pig GPS locations through time, and show the shooting events as red dots that fade out over a few hours. This helps to visualise the overlap between the pig GPS locations and the shooting events, and to see if there are any obvious changes in pig behaviour after shooting events.
 
 ```{r}
 #| label: leaflet-map
@@ -386,8 +296,7 @@ filtered_shooting_locations %>%
 
 # convert to an sf object (x1_/y1_ are in GDA94 / GA Lambert, EPSG:3112)
 # and reproject to WGS84 (EPSG:4326) for leaflet
-pig_all_steps_sf <- pig_all_steps %>%
-  st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>%
+pig_all_steps_sf_wgs84 <- pig_all_steps_sf %>%
   st_transform(crs = 4326)
 
 pal <- colorFactor(viridisLite::viridis(n_distinct(pig_all_steps_sf$name), option = "H"),
@@ -396,7 +305,7 @@ pal <- colorFactor(viridisLite::viridis(n_distinct(pig_all_steps_sf$name), optio
 # addCircleMarkers() draws one SVG element per point, and there are ~246k of
 # them, which locks up the browser (and the VS Code webview in particular).
 # Thin the points for display and draw them with WebGL via leafgl instead.
-pig_map_pts <- pig_all_steps_sf %>%
+pig_map_pts <- pig_all_steps_sf_wgs84 %>%
   group_by(name) %>%
   slice(seq(1, n(), by = 1)) %>% # every ith fix per pig
   ungroup()
@@ -734,90 +643,39 @@ if (interactive()) {
 
 ```
 
-## Summaries of shooting
-
-### Locations through time
-
-```{r}
-
-ggplot() +
-  geom_sf(data = filtered_shooting_locations, aes(colour = shoot_time), size = 0.5) +
-  coord_sf() +
-  theme_bw() +
-  theme(legend.position = "right")
-
-```
-
-### Hours of shooting
-
-```{r}
-
-filtered_shooting_locations <- filtered_shooting_locations %>% 
-  mutate(
-    shoot_hms = lubridate::hour(shoot_time) + lubridate::minute(shoot_time)/60 + lubridate::second(shoot_time)/3600
-  ) 
-
-filtered_shooting_locations %>%
-  ggplot() +
-  geom_histogram(aes(x = shoot_hms), bins = 30, fill = "red", colour = "black") +
-  scale_x_datetime("Shooting time") +
-  theme_bw()
-
-```
-
-### To create a null model to compare against
-
-```{r}
-
-# # create pseudo shooting times
-# filtered_shooting_locations <- filtered_shooting_locations %>%
-#   mutate(
-#     shoot_time = shoot_time + lubridate::weeks(6)
-#   )
-
-```
-
-### Check the CRS
-
-```{r}
-
-# Check CRS
-st_crs(pig_all_steps_sf)
-st_crs(filtered_shooting_locations)
-
-# Update pig GPS locations to match the CRS of the shooting locations
-pig_all_steps_sf <- st_transform(pig_all_steps_sf, st_crs(filtered_shooting_locations))
-st_crs(pig_all_steps_sf)
-
-```
-
 ## Distance in time and space of pig GPS locations to shooting events
 
 ```{r}
 
-# Find all pig/shooting pairs within x km (returns a list of indices)
+# find all pig/shooting pairs within 2000 m (returns a list of indices)
+# this is irrespective of time at this point
 idx <- st_is_within_distance(pig_all_steps_sf, filtered_shooting_locations, dist = 2000)
 
-# Turn that into a table of matched pairs
+# turn that into a table of matched pairs
+# this means that this pig GPS location is within 2000 m of this shooting location
 pairs <- tibble(
   pig_row   = rep(seq_along(idx), lengths(idx)),
   shoot_row = unlist(idx)
 )
 
-# Distance between each matched pair, in metres
+# distance between pig GPS points and shooting locations in metres
 pairs$dist_m <- as.numeric(
   st_distance(pig_all_steps_sf[pairs$pig_row, ],
               filtered_shooting_locations[pairs$shoot_row, ],
               by_element = TRUE)
 )
 
-# Attach the attributes from both objects
+# attach the attributes from both objects
 hits <- bind_cols(
+  # keep only the GPS locations that are within 2000 m of a shooting location
   pig_all_steps_sf[pairs$pig_row, ],
   filtered_shooting_locations[pairs$shoot_row, ] %>% st_drop_geometry(), #%>% rename_with(~ paste0("shoot_", .x)),
   dist_m = pairs$dist_m
 )
 
+# keep only the GPS locations that are within 3 hours of a shooting event
+# also add the time difference between the pig GPS location and the shooting event (in hours)
+# negative values are before the shooting event, positive values are after 
 hits <- hits %>% 
   filter(t1_ >= shoot_time - hours(3),
          t1_ <= shoot_time + hours(3)) %>% 
@@ -827,9 +685,13 @@ hits <- hits %>%
 
 ```
 
-### Keep the nearest in time
+### Keep only the nearest in time
 
-For each shoot and each pig, take the pig GPS location that is nearest in time to the shooting event.
+For each shooting location and each pig, take the pig GPS location that is nearest in time to the shooting event.
+
+From these, we have 182 instances where a pig was within 2000 m and 3 hours of a shooting event. What we have left in this dataframe is the 'focal shooting location', meaning it was as close in time as possible to the shooting event for that pig. 
+
+Using the focal shooting location, we will extract a sequence of locations from before and after the shooting event, to see if there is a change in behaviour.
 
 ```{r}
   
@@ -848,25 +710,25 @@ hits_nearest_time
 
 shoot_focal_window <- 12 # time either side of focal shooting location (in hours)
 
-# One row per focal pig/shooting event, with the temporal window
+# one row per pig/shooting instance, with the temporal window to filter the data by
 focal <- hits_nearest_time %>%
   st_drop_geometry() %>%
   distinct(name, shoot_id, shoot_time) %>%
   mutate(win_start = shoot_time - hours(shoot_focal_window),
          win_end   = shoot_time + hours(shoot_focal_window))
 
-# Shooting locations, same CRS as the pigs, one row per shoot_id
+# shooting locations, one row per shoot_id
 shoot_geom <- filtered_shooting_locations %>%
   select(shoot_id)
 
-# Pull every GPS fix for that pig inside the window
-seqs <- pig_all_steps_sf %>% 
+# pull every GPS fix for that pig inside the window
+shooting_sequences <- pig_all_steps_sf %>% 
   inner_join(focal,
              by = join_by(name, between(t1_, win_start, win_end)),
              relationship = "many-to-many")
 
-# Distance (m) from each fix to its own focal shooting location
-seqs <- seqs %>%
+# distance (m) from each fix to its own focal shooting location
+shooting_sequences <- shooting_sequences %>%
   mutate(
     dist_to_shoot_m = as.numeric(
       st_distance(geometry,
@@ -878,17 +740,17 @@ seqs <- seqs %>%
   ) %>%
   arrange(seq_id, t1_)
 
-seqs
+shooting_sequences
 
 ```
 
 ### Just use the first matching shoot of each day
 
-There are multiple shooting locations on the same day - we will therefore only look at the first shooting event for each pig on that day, and the GPS locations either side of that event.
+Often, there are multiple shooting locations on the same day - we will therefore only look at the first shooting event for each pig on that day, and the GPS locations either side of that event.
 
 ```{r}
 
-seqs_daily <- seqs %>% 
+shooting_sequences_daily <- shooting_sequences %>% 
   mutate(
     shoot_date = lubridate::as_date(shoot_time)
   ) %>% 
@@ -896,31 +758,39 @@ seqs_daily <- seqs %>%
   slice_min(shoot_time, n = 1)  %>% 
   ungroup()
 
-seqs_daily
+shooting_sequences_daily
 
 ```
 
-## Plotting shooting info
+# Pig responses to shooting events
+
+## Distance to the shooting location
+
+Here we are looking at the distance of the pig GPS locations to the shooting location, relative to the time of the shooting event. The red dashed line is the time of the shooting event. Larger values mean they are further away, meaning that increasing values show that they are moving away from where the shooting happened. 
 
 ```{r}
 
-seqs_daily %>%        
+shooting_sequences_daily %>%        
   ggplot(aes(x = time_diff_hrs, y = dist_to_shoot_m, colour = seq_id)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
   geom_path(alpha = 0.5) +
-  # scale_y_continuous("Step length (m)") +
+  scale_y_continuous("Distance to the shooting location (m)") +
   theme_bw() +
   theme(legend.position = "none")
 
 ```
 
-### Step lengths for baseline/response
+## Distance between GPS locations
+
+We call the distance between successive GPS locations the 'step length' (sl). Here we are looking at the step lengths of the pig GPS locations relative to the time of the shooting event. The red dashed line is the time of the shooting event. Larger values mean they are moving faster.
+
+The GPS locations were set to record locations every half an hour, so the step lengths are (typically, sometimes there are missing fixes) the distance between locations every half an hour.
 
 ```{r}
 
 bin_width <- 0.5  # hours
 
-bin_means <- seqs_daily %>%
+bin_means <- shooting_sequences_daily %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
   group_by(bin) %>%
   summarise(
@@ -933,7 +803,7 @@ bin_means <- seqs_daily %>%
     .groups = "drop"
   )
 
-seqs_daily %>% #filter(name == "Dora the Explorer") %>%
+shooting_sequences_daily %>% #filter(name == "Dora the Explorer") %>%
   ggplot(aes(x = time_diff_hrs, y = sl_, colour = seq_id)) +
   geom_path(alpha = 0.5) +
   

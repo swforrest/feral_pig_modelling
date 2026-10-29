@@ -34,7 +34,6 @@ abstract: |
 
 ```{r}
 #| label: packages
-#| code-summary: "Load packages"
 #| message: false
 #| warning: false
 

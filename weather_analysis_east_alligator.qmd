@@ -36,7 +36,6 @@ abstract: |
 
 ```{r}
 #| label: packages
-#| code-summary: "Load packages"
 #| message: false
 #| warning: false
 
@@ -56,7 +55,7 @@ options(scipen = 999)
 ```{r}
 
 # general outputs directory
-outputs_dir <- "outputs/east_alligator/"
+outputs_dir <- "outputs/east_alligator/weather_responses/"
 dir.create(outputs_dir, showWarnings = FALSE, recursive = TRUE)
 
 # for plots with veg categories
@@ -79,21 +78,6 @@ pig_all_steps <- pig_all_steps %>%
     )
 
 ```
-
-# Import shooting observations to get timestamps
-
-```{r}
-
-filtered_shooting_locations <- read_csv("data/filtered_shooting_locations_3112.csv")
-
-# Convert timezone after import (resets to UTC)
-filtered_shooting_locations <- filtered_shooting_locations %>% 
-  mutate(
-    shoot_time  = with_tz(shoot_time, tzone = "Australia/Darwin")
-    )
-
-```
-
 
 ## Drop NAs from weather observations
 
@@ -303,6 +287,20 @@ daily_distance_all <- daily_distance_id_rolling_mean %>%
     n   = n(),
     .groups = "drop"
   )
+
+```
+
+### Import shooting observations to get timestamps
+
+```{r}
+
+filtered_shooting_locations <- read_csv("data/filtered_shooting_locations_3112.csv")
+
+# Convert timezone after import (resets to UTC)
+filtered_shooting_locations <- filtered_shooting_locations %>% 
+  mutate(
+    shoot_time  = with_tz(shoot_time, tzone = "Australia/Darwin")
+    )
 
 ```
 
@@ -895,7 +893,26 @@ vegetation_classes_df <- as.data.frame(vegetation_classes,
 
 ```
 
-### Plot the vegetation classes with the data
+## Plot the vegetation classes with the data
+
+### Define colours for the vegetation classes
+
+```{r}
+
+veg_colours <- c(
+  "Dry Rainforest"          = "#1B5E3A",  # dark green
+  "Eucalypt Open Forest"    = "#B5772B",  # deep ochre
+  "Eucalypt Woodland"       = "#E0B65C",  # light ochre
+  "Floodplain Sedgeland"    = "#D6E2A3",  # pale yellow-green
+  "Melaleuca Woodland"      = "#A9CCE3",  # light blue
+  "Melaleuca Open Forest"   = "#5B97BF",  # mid blue
+  "Melaleuca Closed Forest" = "#2B5F8A",  # dark blue
+  "Mangrove"                = "#2A9D8F",  # teal
+  "Mudflat"                 = "#8A7968",  # grey-brown
+  "Water"                   = "#264653"   # dark blue-gray"
+)
+
+```
 
 ::: {.panel-tabset}
 
@@ -907,7 +924,7 @@ ggplot() +
   geom_raster(data = vegetation_classes_df, 
               aes(x=x, y=y, fill = Veg_class)) +
   coord_sf() +
-  scale_fill_viridis_d("Vegetation") +
+  scale_fill_manual("Vegetation", values = veg_colours) +
   scale_colour_manual(
     "Season",
     values = c("wet" = "skyblue", "dry" = "orange"),
@@ -926,12 +943,12 @@ ggplot() +
               aes(x=x, y=y, fill = Veg_class)) +
   geom_point(data = pig_all_steps,
           aes(x = x1_, y = y1_, colour = season),
-          size = 0.1, alpha = 0.25) + 
+          size = 0.1, alpha = 0.2) + 
   coord_sf() +
-  scale_fill_viridis_d("Vegetation") +
+  scale_fill_manual("Vegetation", values = veg_colours) +
   scale_colour_manual(
     "Season",
-    values = c("wet" = "skyblue", "dry" = "orange"),
+    values = c("wet" = "blue", "dry" = "red"),
     labels = c("wet" = "Wet season", "dry" = "Dry season")) +
   guides(colour = guide_legend(override.aes = list(size = 2, alpha = 1))) +
   theme_bw() +
@@ -951,18 +968,6 @@ veg_props <- pig_all_steps %>%
   group_by(day_frac_bin, season) %>%
   mutate(prop = n / sum(n)) %>%
   ungroup()
-
-veg_colours <- c(
-  "Dry Rainforest"          = "#1B5E3A",  # dark green
-  "Eucalypt Open Forest"    = "#B5772B",  # deep ochre
-  "Eucalypt Woodland"       = "#E0B65C",  # light ochre
-  "Floodplain Sedgeland"    = "#D6E2A3",  # pale yellow-green
-  "Melaleuca Woodland"      = "#A9CCE3",  # light blue
-  "Melaleuca Open Forest"   = "#5B97BF",  # mid blue
-  "Melaleuca Closed Forest" = "#2B5F8A",  # dark blue
-  "Mangrove"                = "#2A9D8F",  # teal
-  "Mudflat"                 = "#8A7968"   # grey-brown
-)
 
 # order veg classes so similar classes are next to each other
 # (first level is drawn at the top)
@@ -989,9 +994,9 @@ veg_props %>% filter(season == "dry") %>%
            colour = "white") +
   
   scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
-    scale_x_continuous("Day fraction", 
-                       limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2),
-                       expand = c(0, 0)) +
+  scale_x_continuous("Day fraction", 
+                     limits = c(-0.5, 1.36), breaks = seq(-1, 1.5, by = 0.2),
+                     expand = c(0, 0)) +
   labs(title = "Vegetation use across the day", subtitle = "Dry season", 
        x = "Time", y = "Proportion of steps", fill = "Vegetation class") +
   scale_fill_manual(values = veg_colours) +
