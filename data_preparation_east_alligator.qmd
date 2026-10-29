@@ -699,10 +699,25 @@ plot(ndmi)
 
 ```{r}
 
+# # read in the alpha earth embeddings for the broader AOI, which are in two tiles
 # alpha_earth_1 <- rast("mapping/feral_pig_aoi_alphaearth_2025-0000000000-0000000000.tif")
 # plot(alpha_earth_1)
 # alpha_earth_2 <- rast("mapping/feral_pig_aoi_alphaearth_2025-0000000000-0000003072.tif")
 # plot(alpha_earth_2)
+# 
+# # crop the alpha earth layers
+# alpha_earth_1_crop <- crop(alpha_earth_1, pig_aoi)
+# alpha_earth_2_crop <- crop(alpha_earth_2, pig_aoi)
+# 
+# # plot
+# plot(alpha_earth_1_crop[[1]])
+# plot(alpha_earth_2_crop[[2]])
+# 
+# # combine the two tiles into one raster
+# alpha_earth_east_alligator <- merge(alpha_earth_1_crop, alpha_earth_2_crop)
+# plot(alpha_earth_east_alligator[[1]])
+# 
+# writeRaster(alpha_earth_east_alligator, "mapping/alphaearth_2025_east_alligator_3112.tif", overwrite = TRUE)
 
 ```
 
@@ -1052,7 +1067,7 @@ plot(is.na(landcover_dummy[["veg_water"]]))
 water_layer <- terra::subst(landcover_dummy[["veg_water"]], NA, 1)
 plot(water_layer)
 
-terra::writeRaster(water_layer, "mapping/water_layer_east_alligator.tif", overwrite = TRUE)
+terra::writeRaster(water_layer, "mapping/water_east_alligator.tif", overwrite = TRUE)
 
 ```
 
