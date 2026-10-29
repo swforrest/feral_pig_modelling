@@ -11,8 +11,9 @@ toc: true
 number-sections: false
 format: 
   html:
-    self-contained: true
-    code-fold: show
+    self-contained: false
+    code-fold: true
+    code-summary: "Show code"
     code-tools: true
     df-print: paged
     code-line-numbers: true

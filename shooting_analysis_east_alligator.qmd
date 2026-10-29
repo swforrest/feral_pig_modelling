@@ -11,7 +11,8 @@ number-sections: false
 format: 
   html:
     self-contained: false
-    code-fold: show
+    code-fold: true
+    code-summary: "Show code"
     code-tools: true
     df-print: paged
     code-line-numbers: true
