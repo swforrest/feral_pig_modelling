@@ -19,10 +19,10 @@ website:
         href: index.qmd
       - text: "Data Preparation"
         href: data_preparation_east_alligator.qmd
-      - text: "Shooting Responses"
-        href: shooting_analysis_east_alligator.qmd
       - text: "Weather Responses"
         href: weather_analysis_east_alligator.qmd
+      - text: "Shooting Responses"
+        href: shooting_analysis_east_alligator.qmd
       - text: "deepSSF Training"
         href: deepssf_piggies_train.ipynb
       - text: "deepSSF Predictions"
