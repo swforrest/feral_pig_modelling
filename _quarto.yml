@@ -2,7 +2,7 @@ project:
   type: website
   output-dir: docs
   resources:
-    - maps/*.html # interactive folium maps, embedded as iframes in the deepSSF predictions page
+    - outputs/**/*.html # interactive folium maps, embedded as iframes in the deepSSF predictions page
 
 execute:
   freeze: auto # re-render only when source changes

@@ -1,12 +1,12 @@
 # Manually added
 data/
 mapping/
-outputs/
+# anchored to the repo root so docs/outputs/ (quarto's copy of the folium maps) is still committed
+/outputs/
 *.pdf
 *.pptx
 andrew_20260822/
-# folium maps; quarto copies them into docs/maps/, which is the committed copy
-maps/
+/maps/
 
 # History files
 .Rhistory
