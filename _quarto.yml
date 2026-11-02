@@ -1,7 +1,9 @@
 project:
   type: website
   output-dir: docs
-  
+  resources:
+    - maps/*.html # interactive folium maps, embedded as iframes in the deepSSF predictions page
+
 execute:
   freeze: auto # re-render only when source changes
 
@@ -21,6 +23,10 @@ website:
         href: shooting_analysis_east_alligator.qmd
       - text: "Weather Responses"
         href: weather_analysis_east_alligator.qmd
+      - text: "deepSSF Training"
+        href: deepssf_piggies_train.ipynb
+      - text: "deepSSF Predictions"
+        href: deepssf_piggies_predict_hab-prob_start.ipynb
         
     right:
       - icon: github

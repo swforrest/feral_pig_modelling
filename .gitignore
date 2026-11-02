@@ -5,6 +5,8 @@ outputs/
 *.pdf
 *.pptx
 andrew_20260822/
+# folium maps; quarto copies them into docs/maps/, which is the committed copy
+maps/
 
 # History files
 .Rhistory
