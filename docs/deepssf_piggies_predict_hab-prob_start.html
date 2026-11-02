@@ -340,8 +340,8 @@ div.csl-indent {
 
 
 <div id="cell-1" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:37.751123Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:37.750945Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.557953Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.557509Z&quot;}}" data-execution_count="126">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -379,8 +379,8 @@ torch 2.12.0</code></pre>
 <h2 class="anchored" data-anchor-id="set-random-seed-and-the-device-for-predicting-from-the-model">Set random seed and the device for predicting from the model</h2>
 <p>If you have a GPU, this is where it will be specified (automatically).</p>
 <div id="cell-3" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:38.571198Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:38.571076Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.584210Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.583922Z&quot;}}" data-execution_count="127">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Reproducibility — fix random seeds so results are the same on every run.</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Prediction is not deterministic: simulate_trajectory() samples a next location</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># from the predicted probability surface at every step, so without a seed two</span></span>
@@ -406,8 +406,8 @@ torch 2.12.0</code></pre>
 <p><code>OUTPUT_DIR</code> is the directory a training run wrote its checkpoints to, given here as a literal path rather than through <code>get_output_dir()</code> (which mints a <em>new</em> dated directory). Figures and rasters produced below are written back into the same directory, alongside the model they came from.</p>
 <p><em>All-caps names below are module-level constants — set once here and referenced throughout the notebook without being reassigned. Python has no built-in constant keyword, so capitalisation is the community convention (PEP 8) to signal “do not change this value”.</em></p>
 <div id="cell-5" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:38.585467Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:38.585399Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.587274Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.586952Z&quot;}}" data-execution_count="128">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>DATA_DIR <span class="op">=</span> Path(<span class="st">"data"</span>)  <span class="co"># location of the bundled sample data</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>MAPPING_DIR <span class="op">=</span> Path(<span class="st">"mapping"</span>)  <span class="co"># location of the landcover mapping files</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>CSV_PATH <span class="op">=</span> DATA_DIR <span class="op">/</span> <span class="st">"pigs_east_alligator_steps_covs_20261015.csv"</span>  <span class="co"># GPS tracking data, 28 individuals</span></span>
@@ -451,8 +451,8 @@ Checkpoints: best_model.pt, best_model_habitat.pt, best_model_movement.pt</code>
 <h1>Import data</h1>
 <p>The csv file is imported with a timestamp and an x and y coordinate. In our case the data was already in a projected format that is specific to Australia (EPSG:3112), which is the same crs as the raster data which will be imported.</p>
 <div id="cell-7" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:38.588201Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:38.588148Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.597239Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.596886Z&quot;}}" data-execution_count="129">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>raw_df <span class="op">=</span> pd.read_csv(CSV_PATH)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Raw GPS fixes : </span><span class="sc">{</span><span class="bu">len</span>(raw_df)<span class="sc">:,}</span><span class="ss">"</span>)</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Individuals   : </span><span class="sc">{</span>raw_df[<span class="st">'name'</span>]<span class="sc">.</span>nunique()<span class="sc">}</span><span class="ss">"</span>)</span>
@@ -652,8 +652,8 @@ Individuals   : 19</code></pre>
 <li>The rescaling uses a <strong>single global min/max across all bands</strong> of a file, and computes <code>(data - lo) / hi</code> rather than <code>(data - lo) / (hi - lo)</code>. Our index raster is <code>int16</code> scaled by 10 000 with ±10 000 fill values, so the loaded values span [0, 2] rather than [0, 1] and the three indices are not individually normalised. That is workable (the CNN can rescale internally) but if it hurts training, pre-scale each band yourself and save as <code>.npy</code> — non-<code>.tif</code> paths in <code>LAYER_PATHS</code> are loaded with <code>np.load(..., mmap_mode='r')</code> and left untouched, though at least one real <code>.tif</code> must remain in the dict so the transform can be set.</li>
 </ol>
 <div id="cell-9" class="cell" data-execution_count="130">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>env_layers, raster_transform <span class="op">=</span> deepssf.load_environmental_layers(LAYER_PATHS)</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Layers loaded:"</span>, <span class="bu">list</span>(env_layers.keys()))</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, arr <span class="kw">in</span> env_layers.items():</span>
@@ -695,8 +695,8 @@ Spatial channels: 67</code></pre>
 </ul>
 <p>The trailing underscore on column names (x1_, y1_, t1_, etc.) flags them as “start of step” variables; x2_, y2_, t2_ are the corresponding “end of step” values, following the convention of the <code>amt</code> package <span class="citation" data-cites="Signer2019-fi">(<a href="#ref-Signer2019-fi" role="doc-biblioref">Signer et al. 2019</a>)</span>. The last fix for each individual is dropped because no forward step can be formed.</p>
 <div id="cell-11" class="cell" data-execution_count="131">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The CSV is already in amt step format, but prepare_movement_df() expects one row</span></span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co"># per *fix* and rebuilds the steps itself (it also derives bearing, dt_hour and the</span></span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># cyclic time encodings the model needs).  Point it at the step-start columns and</span></span>
@@ -887,8 +887,8 @@ Spatial channels: 67</code></pre>
 </ul></li>
 </ul>
 <div id="cell-13" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:38.632353Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:38.632282Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.650894Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.650485Z&quot;}}" data-execution_count="132">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>SCALAR_COLS <span class="op">=</span> [<span class="st">"hour_t1_sin1"</span>,</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>               <span class="st">"hour_t1_cos1"</span>, </span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>               <span class="st">"yday_t1_sin1"</span>, </span>
@@ -901,8 +901,8 @@ Spatial channels: 67</code></pre>
 <h2 class="anchored" data-anchor-id="window_size"><code>WINDOW_SIZE</code></h2>
 <p>The size of the local availability window in cells/pixels - should match what was in the training script.</p>
 <div id="cell-15" class="cell" data-execution_count="133">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>WINDOW_SIZE <span class="op">=</span> <span class="dv">51</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
@@ -911,8 +911,8 @@ Spatial channels: 67</code></pre>
 <h2 class="anchored" data-anchor-id="pixel_size"><code>PIXEL_SIZE</code></h2>
 <p>Raster resolution in CRS units (metres here). Read straight off <code>raster_transform</code> rather than typed in: the transform is the authority on the grid the model is trained against, and a hand-entered value that disagrees with it silently mis-scales the movement kernel — which is parameterised in metres — against a grid measured in pixels.</p>
 <div id="cell-17" class="cell" data-execution_count="134">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># transform.a is the cell width, transform.e the (negative) cell height</span></span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>PIXEL_SIZE <span class="op">=</span> <span class="bu">abs</span>(raster_transform.a)</span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -933,8 +933,8 @@ Spatial channels: 67</code></pre>
 <h2 class="anchored" data-anchor-id="filter_steps_by_window"><code>filter_steps_by_window()</code></h2>
 <p>Removes steps whose straight-line displacement exceeds half the spatial window (WINDOW_SIZE × PIXEL_SIZE / 2 metres). Such steps would place the true next location outside the predicted probability map, causing an index error in the loss function.</p>
 <div id="cell-19" class="cell" data-execution_count="135">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>step_df <span class="op">=</span> deepssf.filter_steps_by_window(</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    step_df, window_size<span class="op">=</span>WINDOW_SIZE, pixel_size<span class="op">=</span>PIXEL_SIZE</span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>)</span>
@@ -957,8 +957,8 @@ Spatial channels: 67</code></pre>
 </ul>
 <p><code>n_scalar_covariates</code> only fills the two <code>ModelParams</code> fields that no layer reads; the scalar count that matters is folded into <code>input_channels</code>, which comes off the weights. The check below is the one thing the checkpoint cannot do for us — that the covariates loaded in <em>this</em> notebook are the ones the model was trained on. It compares counts only, so keep <code>LAYER_PATHS</code> in the training run’s order.</p>
 <div id="22cb1e8f" class="cell" data-execution_count="136">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> deepssf.params_from_checkpoint(</span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>    <span class="bu">str</span>(CKPT_PATH),</span>
 <span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    image_dim<span class="op">=</span>WINDOW_SIZE,               <span class="co"># not recorded in the weights</span></span>
@@ -1012,8 +1012,8 @@ Spatial channels: 67</code></pre>
 <p>The deepSSF model! A joint habitat–movement model with two heads: 1. Habitat head — a small CNN applied to the spatial window (env layers + tiled scalars) that outputs a per-pixel log-suitability map. 2. Movement head — a dense MLP (fully-connected layer) that takes the scalar covariates and the previous bearing, and produces parameters for a parametric movement kernel (a mixture of wrapped distributions centred on the current location).</p>
 <p>The two log-probability surfaces are summed pixel-wise to give the joint predicted probability map for the animal’s next step.</p>
 <div id="cell-23" class="cell" data-execution_count="137">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> deepssf.ConvJointModel(params).to(DEVICE)</span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>n_params <span class="op">=</span> <span class="bu">sum</span>(p.numel() <span class="cf">for</span> p <span class="kw">in</span> model.parameters())</span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Model parameters : </span><span class="sc">{</span>n_params<span class="sc">:,}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -1033,8 +1033,8 @@ Spatial channels: 67</code></pre>
 <p>Mixing them is a deliberate trade: taking the habitat head from a different epoch gives the sharpest habitat surface to <em>map</em>, but the two heads then come from different epochs and the joint model’s likelihood is no longer what either checkpoint recorded. Use it for the landscape predictions below, not for simulating trajectories.</p>
 <p><code>load_checkpoint()</code> loads the weights in place and is strict about shapes, so a mismatch between the constants set above and the trained architecture raises here rather than silently predicting from a partly-random model.</p>
 <div id="cell-25" class="cell" data-execution_count="138">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The joint model — what the simulations further down should use</span></span>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>ckpt <span class="op">=</span> deepssf.load_checkpoint(<span class="bu">str</span>(CKPT_PATH), model)</span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"best_model.pt          saved on '</span><span class="sc">{</span>ckpt[<span class="st">'checkpoint_criterion'</span>]<span class="sc">}</span><span class="ss">' "</span></span>
@@ -1120,8 +1120,8 @@ best_model_habitat.pt  saved on 'habitat' = 7.548429
 <p><code>predict_habitat_landscape()</code>, <code>simulate_trajectory()</code> and <code>simulate_trajectories()</code> all call <code>get_landscape(month_index)</code> to fetch the current environmental layers as a list of 2-D tensors.</p>
 <p>With static (non-seasonal) rasters the <code>month_index</code> argument is unused. For seasonal data (e.g.&nbsp;monthly NDVI composites) you would index into a stack of layers here based on the current month.</p>
 <div id="dbf488cc" class="cell" data-execution_count="139">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The simulation and prediction functions stack the list returned by</span></span>
 <span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="co"># get_landscape() along a new channel dimension, so every element must be a *2-D*</span></span>
 <span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="co"># tensor.  Unbind the band dimension of any multi-band layer so the channel order</span></span>
@@ -1151,8 +1151,8 @@ best_model_habitat.pt  saved on 'habitat' = 7.548429
 <p>This function creates the sin/cos encodings for specific days and hours of the year, and is used when simulating to convert from days of the year and hours into sin/cos encodings. It will return a tuple of length <code>n_steps</code>.</p>
 <p>Here, we just want the sin/cos encodings for a single point in time, so we just set <code>n_steps</code> to 1 and input a day of the year (<code>PRED_YDAY</code>, integer) and fractional hour (<code>PRED_HOUR</code>, float).</p>
 <div id="cell-29" class="cell" data-execution_count="140">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Predict for one moment in time: 9:30 am on day 200.  </span></span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>PRED_YDAY <span class="op">=</span> <span class="dv">200</span> <span class="co"># what day of the year to simulate (1–365, integer)</span></span>
 <span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>PRED_HOUR <span class="op">=</span> <span class="fl">9.5</span> <span class="co"># what hour of the day to simulate (0–24, float)</span></span>
@@ -1207,8 +1207,8 @@ best_model_habitat.pt  saved on 'habitat' = 7.548429
 <li><strong>Outputs</strong>: a <code>[height, width]</code> NumPy array of log-probabilities, <code>NaN</code> in the border. Take <code>np.exp()</code> for probabilities.</li>
 </ul>
 <div id="cell-31" class="cell" data-execution_count="141">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>habitat_log <span class="op">=</span> deepssf.predict_habitat_landscape(</span>
 <span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>    model,</span>
 <span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    landscape_rasters<span class="op">=</span>get_landscape(<span class="dv">0</span>),   <span class="co"># static layers → month index 0</span></span>
@@ -1231,8 +1231,8 @@ probabilities sum to  : 1.0000</code></pre>
 <h3 class="anchored" data-anchor-id="plot-the-landscape-scale-habitat-selection-surface">Plot the landscape-scale habitat selection surface</h3>
 <p>Plotted on the <strong>log</strong> scale. Across 9.5 million cells the probabilities are tiny (a uniform surface would give ~1e-7 per cell) and a handful of very attractive cells dominate the linear range, so a linear colour scale washes the whole map out. The colour limits are clipped to percentiles for the same reason.</p>
 <div id="cell-33" class="cell" data-execution_count="142">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">14</span>, <span class="fl">5.5</span>))</span>
 <span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Percentile limits: a few extreme cells otherwise dominate the colour range</span></span>
@@ -1280,8 +1280,8 @@ probabilities sum to  : 1.0000</code></pre>
 <p>Each surface is normalised over the landscape independently, so the panels show where selection is concentrated at that hour, not the overall level of activity.</p>
 <p>These surfaces <strong>only</strong> show the habitat selection, and not where would expect to find pigs, as these maps do not take movement into consideration. To generate distribution maps we need to simulate movement trajectories.</p>
 <div id="cell-35" class="cell" data-execution_count="143">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>PRED_HOURS <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">6</span>, <span class="dv">12</span>, <span class="dv">18</span>]</span>
 <span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>COLOUR_PC_MIN <span class="op">=</span> <span class="fl">10.0</span>    <span class="co"># setting this quite high to prevent water from dominating the lower range</span></span>
 <span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>COLOUR_PC_MAX <span class="op">=</span> <span class="fl">99.0</span>    <span class="co"># percentile limits for colour range</span></span>
@@ -1335,8 +1335,8 @@ max |log-prob difference| between 00:00 and 18:00: 1.819</code></pre>
 <h3 class="anchored" data-anchor-id="create-a-gif-of-the-hourly-habitat-selection-surfaces">Create a GIF of the hourly habitat selection surfaces</h3>
 <p>Save each hourly habitat selection map as a PNG (within a subdirectory called ‘habitat_selection_maps’), and then combine them into a GIF.</p>
 <div id="cell-37" class="cell" data-execution_count="144">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>HABITAT_MAP_DIR <span class="op">=</span> OUTPUT_DIR <span class="op">/</span> <span class="st">"habitat_selection_maps"</span></span>
 <span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>HABITAT_MAP_DIR.mkdir(exist_ok<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -1388,8 +1388,8 @@ Wrote 24 frames to outputs/alphaearth/2026-10-29_1/habitat_selection_maps</code>
 <section id="display-the-gif-of-hourly-habitat-selection" class="level3">
 <h3 class="anchored" data-anchor-id="display-the-gif-of-hourly-habitat-selection">Display the GIF of hourly habitat selection</h3>
 <div id="cell-39" class="cell" data-execution_count="145">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> imageio.v2 <span class="im">as</span> imageio</span>
 <span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>habitat_gif <span class="op">=</span> OUTPUT_DIR <span class="op">/</span> <span class="st">"habitat_selection_hourly.gif"</span></span>
@@ -1432,8 +1432,8 @@ Wrote 24 frames to outputs/alphaearth/2026-10-29_1/habitat_selection_maps</code>
 <p>Writing them out with the raster’s transform and CRS means they can be opened directly in QGIS/ArcGIS or read back with <code>rasterio</code>, and overlaid on the other layers in <code>mapping/</code>.</p>
 <p>One <strong>band per hour</strong> rather than one file per hour: the 24 surfaces share a grid, a transform and a CRS, so a single stack keeps them together and lets GIS software step through the day with the band slider. Band <em>n</em> is hour <em>n - 1</em> (GDAL numbers bands from 1), and each band carries its hour in both its description and its tags — so <code>src.read(15)</code> is 14:00.</p>
 <div id="cell-41" class="cell" data-execution_count="146">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The CRS is not returned by load_environmental_layers(), so read it off the</span></span>
 <span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="co"># source raster the transform came from.</span></span>
 <span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> rasterio.<span class="bu">open</span>(<span class="bu">next</span>(<span class="bu">iter</span>(LAYER_PATHS.values()))) <span class="im">as</span> src:</span>
@@ -1483,8 +1483,8 @@ Wrote 24 frames to outputs/alphaearth/2026-10-29_1/habitat_selection_maps</code>
 <p>Select starting parameters for the model.</p>
 <p>We’ve set the starting location to be the first location of the observed data.</p>
 <div id="cell-43" class="cell" data-execution_count="147">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co"># the starting id of the step (should be 1)</span></span>
 <span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>START_IDX <span class="op">=</span> <span class="dv">1</span></span>
 <span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -1582,8 +1582,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 </ul></li>
 </ul>
 <div id="cell-45" class="cell" data-execution_count="148">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>sim_df <span class="op">=</span> deepssf.simulate_trajectory(</span>
 <span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>    model,</span>
 <span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>    get_landscape<span class="op">=</span>get_landscape,</span>
@@ -1668,8 +1668,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 <section id="plot-the-simulated-data" class="level3">
 <h3 class="anchored" data-anchor-id="plot-the-simulated-data">Plot the simulated data</h3>
 <div id="cell-47" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:57.806437Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:57.806367Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:57.904907Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:57.904447Z&quot;}}" data-execution_count="149">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">7</span>, <span class="dv">6</span>))</span>
 <span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a><span class="co"># First spatial channel (NDVI with the index raster) as the background</span></span>
 <span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>rasterio.plot.show(</span>
@@ -1739,8 +1739,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 </ul>
 <p><code>folium</code> is an optional dependency: <code>pip install folium</code> (or <code>pip install "deepSSF[maps]"</code>).</p>
 <div id="cell-49" class="cell" data-execution_count="150">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>fmap <span class="op">=</span> deepssf.plot_trajectories_folium(</span>
 <span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>    sim_df,</span>
 <span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>    observed<span class="op">=</span>step_df,</span>
@@ -1780,8 +1780,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 <li><strong>Outputs</strong>: the list of paths written</li>
 </ul>
 <div id="cell-51" class="cell" data-execution_count="151">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="co"># set up a directory to hold the CSV files for the simulated trajectories</span></span>
 <span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>TRAJ_DIR <span class="op">=</span> OUTPUT_DIR <span class="op">/</span> <span class="st">"deepSSF_trajectories"</span></span>
 <span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -1840,8 +1840,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 <p>We weight the starting points by the habitat selection probability at the time and yday of the first observed location.</p>
 <p>We will discard locations from the start of the simulations so there isn’t too much of a bias towards these starting locations.</p>
 <div id="cell-54" class="cell" data-execution_count="152">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>N_TRAJECTORIES <span class="op">=</span> <span class="dv">2500</span>   <span class="co"># how many simulated trajectories (one starting location each)</span></span>
 <span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Habitat selection surface at the time the simulations start (the first observed</span></span>
@@ -1905,8 +1905,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 </div>
 </div>
 <div id="cell-55" class="cell" data-execution_count="153">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>N_SIM_STEPS <span class="op">=</span> <span class="dv">1000</span><span class="op">+</span><span class="dv">48</span><span class="op">*</span><span class="dv">365</span><span class="op">*</span><span class="dv">1</span>  <span class="co"># how many steps per trajectory - half-hourly steps for a year</span></span>
 <span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"This will simulate </span><span class="sc">{</span>N_TRAJECTORIES<span class="sc">:,}</span><span class="ss"> trajectories, each </span><span class="sc">{</span>N_SIM_STEPS<span class="sc">:,}</span><span class="ss"> steps "</span></span>
@@ -1917,8 +1917,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 </div>
 </div>
 <div id="cell-56" class="cell">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>sim_many <span class="op">=</span> deepssf.simulate_trajectories(</span>
 <span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>    model,</span>
 <span id="cb55-3"><a href="#cb55-3" aria-hidden="true" tabindex="-1"></a>    get_landscape<span class="op">=</span>get_landscape,</span>
@@ -1945,8 +1945,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 <h3 class="anchored" data-anchor-id="save-the-simulated-trajectories">Save the simulated trajectories</h3>
 <p><code>split=False</code> (the default) writes one combined CSV with the <code>trajectory_id</code> column; <code>split=True</code> writes one file per simulated individual.</p>
 <div id="cell-58" class="cell">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb56"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a>deepssf.save_trajectories(sim_many, TRAJ_DIR, prefix<span class="op">=</span><span class="st">"deepSSF_pigs"</span>)</span>
 <span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a><span class="co"># ...or one file per simulated animal:</span></span>
@@ -1954,8 +1954,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 </details>
 </div>
 <div id="cell-59" class="cell">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb57"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a><span class="co"># # read previously run simulations from disk, rather than re-running the simulation above</span></span>
 <span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a><span class="co"># SIM_PATH = TRAJ_DIR / "deepSSF_pigs_2500traj_18520steps_2026-10-29.csv"</span></span>
 <span id="cb57-3"><a href="#cb57-3" aria-hidden="true" tabindex="-1"></a><span class="co"># sim_many = pd.read_csv(SIM_PATH)</span></span>
@@ -2049,8 +2049,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 <section id="plot-the-simulated-trajectories" class="level3">
 <h3 class="anchored" data-anchor-id="plot-the-simulated-trajectories">Plot the simulated trajectories</h3>
 <div id="cell-61" class="cell" data-execution_count="179">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb59"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>N_PLOT_TRAJ <span class="op">=</span> <span class="dv">5</span>   <span class="co"># how many of the simulated trajectories to draw</span></span>
 <span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a><span class="co"># first N_PLOT_TRAJ unique trajectory IDs, in the order they appear in the DataFrame</span></span>
@@ -2092,8 +2092,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 <h3 class="anchored" data-anchor-id="the-same-trajectories-on-the-interactive-map">The same trajectories on the interactive map</h3>
 <p>Each trajectory gets its own colour and its own entry in the layer control (top right), so individual animals can be switched on and off.</p>
 <div id="cell-63" class="cell" data-execution_count="180">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb60"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="co"># folium writes every trajectory into the page as its own feature group, so all</span></span>
 <span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a><span class="co"># 599 make a map too heavy to open.  Draw a subset — the heatmap below is what</span></span>
 <span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a><span class="co"># summarises the full set.</span></span>
@@ -2157,8 +2157,8 @@ Starting time      : day 283, 9.50 h</code></pre>
 <p><code>HEATMAP_PERIOD</code> selects which part of the year the counts come from: <code>"full"</code> uses every simulated location, <code>"wet"</code> and <code>"dry"</code> keep only those whose day-of-year falls in the November–April wet season or the May–October dry season. The period is filtered before <code>trajectory_heatmap()</code> is called and named in the output filenames, so the three surfaces can be written side by side.</p>
 <p>The result is visualised as a PNG below, written to a GeoTIFF with <code>save_raster()</code> so it can be opened in QGIS, and added to the interactive map as a layer that can be toggled on and off with <code>add_heatmap_overlay()</code>.</p>
 <div id="cell-65" class="cell" data-execution_count="181">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb62"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a>HEATMAP_DF     <span class="op">=</span> sim_many  <span class="co"># trajectories to summarise (or sim_many)</span></span>
 <span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a>BURN_IN        <span class="op">=</span> <span class="dv">1000</span>              <span class="co"># drop the first n steps of every trajectory</span></span>
 <span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a>HEATMAP_AGG    <span class="op">=</span> <span class="dv">2</span>              <span class="co"># heatmap cell = HEATMAP_AGG x HEATMAP_AGG raster pixels</span></span>
@@ -2233,8 +2233,8 @@ Heatmap grid: 668 x 858 cells of 40 m
 <h3 class="anchored" data-anchor-id="plot-the-heatmap">Plot the heatmap</h3>
 <p>Counts are drawn on a <strong>log</strong> colour scale — a handful of cells in some cells usually hold an order of magnitude more locations than the rest (possibly due to bias towards the release sites or getting ‘stuck’ in certain areas), which would flatten a linear scale to a single bright dot. Empty cells are masked so the landscape shows through.</p>
 <div id="cell-67" class="cell" data-execution_count="182">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb64"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="fl">8.5</span>, <span class="dv">7</span>))</span>
 <span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Greyscale background so the (colourful) heatmap stays readable on top</span></span>
 <span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a>rasterio.plot.show(</span>
@@ -2282,8 +2282,8 @@ Heatmap grid: 668 x 858 cells of 40 m
 <h2 class="anchored" data-anchor-id="save_raster"><code>save_raster()</code></h2>
 <p>Writes any landscape-shaped array out as a GeoTIFF, given the transform and CRS that georeference it — the heatmap here, or the habitat selection surface above. <code>nodata=0</code> means unvisited cells are drawn as transparent rather than as a solid zero-valued block.</p>
 <div id="cell-69" class="cell" data-execution_count="183">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb65"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a><span class="co"># load_environmental_layers() does not return the CRS, so read it off the source</span></span>
 <span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a><span class="co"># raster the transform came from.</span></span>
 <span id="cb65-3"><a href="#cb65-3" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> rasterio.<span class="bu">open</span>(<span class="bu">next</span>(<span class="bu">iter</span>(LAYER_PATHS.values()))) <span class="im">as</span> src:</span>
@@ -2313,8 +2313,8 @@ Heatmap grid: 668 x 858 cells of 40 m
 <p><code>plot_trajectories_folium()</code> returns the <code>folium.Map</code>, so the heatmap can be added to it afterwards as an image overlay. folium writes each layer’s JavaScript in the order it was added, so <code>add_heatmap_overlay()</code> moves the layer control back to the end — otherwise it would run before the overlay exists and throw, taking the rest of the map’s script with it. The heatmap then picks up its own checkbox alongside the observed locations and each simulated trajectory.</p>
 <p>The counts are warped from the projected CRS to Web Mercator — the projection Leaflet stretches an overlay in — and coloured with the same log scale as the PNG, with cells below <code>vmin</code> (1 by default) left fully transparent.</p>
 <div id="cell-71" class="cell" data-execution_count="184">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb67"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Same subset of trajectories as the map above; the overlay covers all of them.</span></span>
 <span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a><span class="co"># The trajectory lines are drawn from the period-filtered locations too, so the</span></span>
 <span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a><span class="co"># lines and the overlay describe the same slice of the year.</span></span>
@@ -2412,8 +2412,8 @@ Heatmap grid: 668 x 858 cells of 40 m
 <section id="wet-season" class="level2">
 <h2 class="anchored" data-anchor-id="wet-season">Wet season</h2>
 <div id="cell-74" class="cell" data-execution_count="185">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb69"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a>BETWEENNESS_DF        <span class="op">=</span> sim_many  <span class="co"># trajectories to build the network from</span></span>
 <span id="cb69-2"><a href="#cb69-2" aria-hidden="true" tabindex="-1"></a>BETWEENNESS_AGG       <span class="op">=</span> <span class="dv">5</span>              <span class="co"># network cell = AGG x AGG raster pixels (n x 20 m)</span></span>
 <span id="cb69-3"><a href="#cb69-3" aria-hidden="true" tabindex="-1"></a>BETWEENNESS_BURN_IN   <span class="op">=</span> <span class="dv">1000</span>              <span class="co"># drop the first n steps of every trajectory</span></span>
@@ -2503,8 +2503,8 @@ Heatmap grid: 668 x 858 cells of 40 m
 <h3 class="anchored" data-anchor-id="build-the-network-and-calculate-betweenness">Build the network and calculate betweenness</h3>
 <p>The period filter is the same <code>filter_period()</code> the heatmap uses, so a betweenness surface and a heatmap built with the same <code>PERIOD</code> describe the same slice of the year.</p>
 <div id="cell-76" class="cell" data-execution_count="186">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb71"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>bet_df <span class="op">=</span> filter_period(BETWEENNESS_DF, BETWEENNESS_PERIOD)</span>
 <span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a><span class="co"># renumber steps sequentially within the period (closes the gaps between seasons)</span></span>
@@ -2592,8 +2592,8 @@ Betweenness computed in 670 s (approximate, 1000 pivots)
 <h3 class="anchored" data-anchor-id="plot-the-betweenness-surface">Plot the betweenness surface</h3>
 <p>Drawn on a <strong>square-root</strong> scale, as in the R script — a handful of corridors carry far more shortest paths than anywhere else, and on a linear scale everything but those few cells goes black. Cells no trajectory entered are masked so the landscape shows through, the same way empty cells are masked on the heatmap.</p>
 <div id="cell-78" class="cell" data-execution_count="187">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb73"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="fl">8.5</span>, <span class="dv">7</span>))</span>
 <span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Greyscale background so the (colourful) betweenness stays readable on top</span></span>
 <span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a>rasterio.plot.show(</span>
@@ -2632,8 +2632,8 @@ Betweenness computed in 670 s (approximate, 1000 pivots)
 <h3 class="anchored" data-anchor-id="save-the-betweenness-surface-as-a-raster-tif">Save the betweenness surface as a raster (TIF)</h3>
 <p>Same <code>save_raster()</code> as the heatmap, on the coarsened transform. <code>nodata=np.nan</code> marks the cells no trajectory entered, so they open as transparent rather than as real zeros next to cells that genuinely scored zero.</p>
 <div id="cell-80" class="cell" data-execution_count="188">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb74"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a>betweenness_tif <span class="op">=</span> deepssf.save_raster(</span>
 <span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a>    betweenness,</span>
 <span id="cb74-3"><a href="#cb74-3" aria-hidden="true" tabindex="-1"></a>    OUTPUT_DIR</span>
@@ -2654,8 +2654,8 @@ Betweenness computed in 670 s (approximate, 1000 pivots)
 <h3 class="anchored" data-anchor-id="toggle-betweenness-on-the-interactive-map">Toggle betweenness on the interactive map</h3>
 <p><code>add_heatmap_overlay()</code> takes any array on a regular grid, not just counts, so the betweenness surface goes onto a folium map exactly as the heatmap did — on the same square-root scale as the PNG above.</p>
 <div id="cell-82" class="cell" data-execution_count="189">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb76"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a>bet_ids <span class="op">=</span> bet_df[<span class="st">"trajectory_id"</span>].unique()[:N_MAP_TRAJECTORIES]</span>
 <span id="cb76-2"><a href="#cb76-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb76-3"><a href="#cb76-3" aria-hidden="true" tabindex="-1"></a>fmap_bet <span class="op">=</span> deepssf.plot_trajectories_folium(</span>
@@ -2702,17 +2702,17 @@ Betweenness computed in 670 s (approximate, 1000 pivots)
 <section id="dry-season" class="level2">
 <h2 class="anchored" data-anchor-id="dry-season">Dry season</h2>
 <div id="cell-84" class="cell" data-execution_count="190">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb78"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a>BETWEENNESS_PERIOD    <span class="op">=</span> <span class="st">"dry"</span>         <span class="co"># "full", "wet" or "dry" — as for the heatmap</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 <section id="build-the-network-and-calculate-betweenness-1" class="level3">
 <h3 class="anchored" data-anchor-id="build-the-network-and-calculate-betweenness-1">Build the network and calculate betweenness</h3>
 <p>The period filter is the same <code>filter_period()</code> the heatmap uses, so a betweenness surface and a heatmap built with the same <code>PERIOD</code> describe the same slice of the year.</p>
-<div id="cell-86" class="cell">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<div id="cell-86" class="cell" data-execution_count="191">
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb79"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb79-1"><a href="#cb79-1" aria-hidden="true" tabindex="-1"></a>bet_df <span class="op">=</span> filter_period(BETWEENNESS_DF, BETWEENNESS_PERIOD)</span>
 <span id="cb79-2"><a href="#cb79-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb79-3"><a href="#cb79-3" aria-hidden="true" tabindex="-1"></a><span class="co"># renumber steps sequentially within the period (closes the gaps between seasons)</span></span>
@@ -2790,16 +2790,18 @@ Betweenness computed in 670 s (approximate, 1000 pivots)
 <div class="cell-output cell-output-stdout">
 <pre><code>Period: dry — 6,250,000 locations from 2500 trajectories, steps 1000 to 3499
 373,509 unique transitions found in 2 s (0 dropped at the raster edge)
-Network: 91,581 nodes, 373,509 edges</code></pre>
+Network: 91,581 nodes, 373,509 edges
+Betweenness computed in 824 s (approximate, 1000 pivots)
+80,215 of 91,581 cells were entered by at least one trajectory; betweenness runs from 0 to 1,638,014,592</code></pre>
 </div>
 </div>
 </section>
 <section id="plot-the-betweenness-surface-1" class="level3">
 <h3 class="anchored" data-anchor-id="plot-the-betweenness-surface-1">Plot the betweenness surface</h3>
 <p>Drawn on a <strong>square-root</strong> scale, as in the R script — a handful of corridors carry far more shortest paths than anywhere else, and on a linear scale everything but those few cells goes black. Cells no trajectory entered are masked so the landscape shows through, the same way empty cells are masked on the heatmap.</p>
-<div id="cell-88" class="cell">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<div id="cell-88" class="cell" data-execution_count="192">
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb81"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb81-1"><a href="#cb81-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="fl">8.5</span>, <span class="dv">7</span>))</span>
 <span id="cb81-2"><a href="#cb81-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Greyscale background so the (colourful) betweenness stays readable on top</span></span>
 <span id="cb81-3"><a href="#cb81-3" aria-hidden="true" tabindex="-1"></a>rasterio.plot.show(</span>
@@ -2837,9 +2839,9 @@ Network: 91,581 nodes, 373,509 edges</code></pre>
 <section id="save-the-betweenness-surface-as-a-raster-tif-1" class="level3">
 <h3 class="anchored" data-anchor-id="save-the-betweenness-surface-as-a-raster-tif-1">Save the betweenness surface as a raster (TIF)</h3>
 <p>Same <code>save_raster()</code> as the heatmap, on the coarsened transform. <code>nodata=np.nan</code> marks the cells no trajectory entered, so they open as transparent rather than as real zeros next to cells that genuinely scored zero.</p>
-<div id="cell-90" class="cell">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<div id="cell-90" class="cell" data-execution_count="193">
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb82"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb82-1"><a href="#cb82-1" aria-hidden="true" tabindex="-1"></a>betweenness_tif <span class="op">=</span> deepssf.save_raster(</span>
 <span id="cb82-2"><a href="#cb82-2" aria-hidden="true" tabindex="-1"></a>    betweenness,</span>
 <span id="cb82-3"><a href="#cb82-3" aria-hidden="true" tabindex="-1"></a>    OUTPUT_DIR</span>
@@ -2859,9 +2861,9 @@ Network: 91,581 nodes, 373,509 edges</code></pre>
 <section id="toggle-betweenness-on-the-interactive-map-1" class="level3">
 <h3 class="anchored" data-anchor-id="toggle-betweenness-on-the-interactive-map-1">Toggle betweenness on the interactive map</h3>
 <p><code>add_heatmap_overlay()</code> takes any array on a regular grid, not just counts, so the betweenness surface goes onto a folium map exactly as the heatmap did — on the same square-root scale as the PNG above.</p>
-<div id="cell-92" class="cell">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<div id="cell-92" class="cell" data-execution_count="194">
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb84"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb84-1"><a href="#cb84-1" aria-hidden="true" tabindex="-1"></a>bet_ids <span class="op">=</span> bet_df[<span class="st">"trajectory_id"</span>].unique()[:N_MAP_TRAJECTORIES]</span>
 <span id="cb84-2"><a href="#cb84-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb84-3"><a href="#cb84-3" aria-hidden="true" tabindex="-1"></a>fmap_bet <span class="op">=</span> deepssf.plot_trajectories_folium(</span>
@@ -2897,7 +2899,7 @@ Network: 91,581 nodes, 373,509 edges</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>Map saved: outputs/alphaearth/2026-10-29_1/betweenness_map_dry.html</code></pre>
 </div>
-<div class="cell-output cell-output-display" data-execution_count="125">
+<div class="cell-output cell-output-display" data-execution_count="194">
 
         <iframe width="100%" height="650" src="outputs/alphaearth/2026-10-29_1/betweenness_map_dry.html" frameborder="0" allowfullscreen=""></iframe>
         

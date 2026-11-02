@@ -973,67 +973,64 @@ shooting_sequences_daily_pseudo %>% #filter(name == "Dora the Explorer") %>%
 
 ```
 
-## Same time but far away pigs
+## Same time but far away
+
+Here we get locations for pigs that have locations at the same time as the shooting events, but which were more than 5 km away.
 
 ```{r}
 
-# find all pig/shooting pairs within 2000 m (returns a list of indices)
-# this is irrespective of time at this point
-idx <- st_is_within_distance(pig_all_steps_sf, filtered_shooting_locations, dist = 5000)
+# add an ID to the shooting locations
+shoot <- filtered_shooting_locations %>%
+  mutate(shoot_id = row_number())
 
-# keep points with no shooting location within 2 km
-outside <- pig_all_steps_sf[lengths(idx) == 0, ]
+# add an ID to the pig GPS locations
+pig <- pig_all_steps_sf %>%
+  mutate(pig_row = row_number())
 
-# turn that into a table of matched pairs
-# this means that this pig GPS location is within 2000 m of this shooting location
-pairs <- tibble(
-  pig_row   = rep(seq_along(idx), lengths(idx)),
-  shoot_row = unlist(idx)
-)
+# initial matching window - just grab the pig locations that are 
+# within three hours of the shooting locations
+window <- 3 * 3600  # seconds; narrow this if you want "same time" more strictly
 
-# distance between pig GPS points and shooting locations in metres
-pairs$dist_m <- as.numeric(
-  st_distance(pig_all_steps_sf[pairs$pig_row, ],
-              filtered_shooting_locations[pairs$shoot_row, ],
-              by_element = TRUE)
-)
+# time-match pairs 
+pairs <- pig %>%
+  st_drop_geometry() %>%
+  select(name, pig_row, t1_) %>%                        # your pig timestamp column
+  inner_join(
+    shoot %>%
+      st_drop_geometry() %>%
+      transmute(shoot_id, shoot_time,          # your shooting timestamp column
+                lo = shoot_time - window,
+                hi = shoot_time + window),
+    by = join_by(between(t1_, lo, hi))
+  )
 
-# attach the attributes from both objects
-hits <- bind_cols(
-  # keep only the GPS locations that are within 2000 m of a shooting location
-  pig_all_steps_sf[pairs$pig_row, ],
-  filtered_shooting_locations[pairs$shoot_row, ] %>% st_drop_geometry(), #%>% rename_with(~ paste0("shoot_", .x)),
-  dist_m = pairs$dist_m
-)
+# distance for each matched pair only
+pairs$dist_m <- st_distance(
+  st_geometry(pig)[pairs$pig_row],
+  st_geometry(shoot)[pairs$shoot_id],
+  by_element = TRUE
+) %>% as.numeric()
 
-# keep only the GPS locations that are within 3 hours of a shooting event
-# also add the time difference between the pig GPS location and the shooting event (in hours)
-# negative values are before the shooting event, positive values are after 
-hits <- hits %>% 
-  filter(t1_ >= shoot_time - hours(3),
-         t1_ <= shoot_time + hours(3)) %>% 
+hist(pairs$dist_m)
+
+# fixes more than 10 km from a shooting event while it was happening
+far_during_shooting <- pairs %>%
+  filter(dist_m > 10000) %>% 
   mutate(
-    shoot_time_diff = as.numeric(difftime(t1_, shoot_time, units = "hours")),
-  ) 
+    shoot_time_diff = as.numeric(difftime(t1_, shoot_time, units = "hours"))
+  )
 
-```
-
-### Keep only the nearest in time
-
-For each shooting location and each pig, take the pig GPS location that is nearest in time to the shooting event.
-
-From these, we have 182 instances where a pig was within 2000 m and 3 hours of a shooting event. What we have left in this dataframe is the 'focal shooting location', meaning it was nearest in time to the shooting event for that pig. 
-
-Using the focal shooting location, we will extract a sequence of locations from before and after the shooting event, to see if there is a change in behaviour.
-
-```{r}
-  
-hits_nearest_time <- hits %>% 
+# keep only the nearest in time
+hits_nearest_time_far <- far_during_shooting %>% 
   group_by(name, shoot_id) %>% 
   slice_min(abs(shoot_time_diff), n = 1)  %>% 
   ungroup()
 
-hits_nearest_time
+# pull out the shoot ids that had matching locations
+obs_shoot_ids <- unique(hits_nearest_time$shoot_id)
+
+# keep the far away locations for shoot ids where there was overlap
+hits_nearest_time_far <- hits_nearest_time_far %>% filter(shoot_id %in% obs_shoot_ids)
 
 ```
 
@@ -1044,7 +1041,7 @@ hits_nearest_time
 shoot_focal_window <- 12 # time either side of focal shooting location (in hours)
 
 # one row per pig/shooting instance, with the temporal window to filter the data by
-focal <- hits_nearest_time %>%
+focal_far <- hits_nearest_time_far %>%
   st_drop_geometry() %>%
   distinct(name, shoot_id, shoot_time) %>%
   mutate(win_start = shoot_time - hours(shoot_focal_window),
@@ -1055,13 +1052,14 @@ shoot_geom <- filtered_shooting_locations %>%
   select(shoot_id)
 
 # pull every GPS fix for that pig inside the window
-shooting_sequences <- pig_all_steps_sf %>% 
-  inner_join(focal,
+shooting_sequences_far <- pig_all_steps_sf %>% 
+  inner_join(focal_far,
              by = join_by(name, between(t1_, win_start, win_end)),
-             relationship = "many-to-many")
+             relationship = "many-to-many") %>% 
+  arrange(name, t1_)
 
 # distance (m) from each fix to its own focal shooting location
-shooting_sequences <- shooting_sequences %>%
+shooting_sequences_far <- shooting_sequences_far %>%
   mutate(
     dist_to_shoot_m = as.numeric(
       st_distance(geometry,
@@ -1073,17 +1071,17 @@ shooting_sequences <- shooting_sequences %>%
   ) %>%
   arrange(seq_id, t1_)
 
-shooting_sequences
+shooting_sequences_far
 
 ```
 
-### Just use the first matching shoot of each day
+### Just keep the first matching shoot of each day
 
 Often, there are multiple shooting locations on the same day - we will therefore only look at the first shooting event for each pig on that day, and the GPS locations either side of that event.
 
 ```{r}
 
-shooting_sequences_daily <- shooting_sequences %>% 
+shooting_sequences_daily_far <- shooting_sequences_far %>% 
   mutate(
     shoot_date = lubridate::as_date(shoot_time)
   ) %>% 
@@ -1091,7 +1089,7 @@ shooting_sequences_daily <- shooting_sequences %>%
   slice_min(shoot_time, n = 1)  %>% 
   ungroup()
 
-shooting_sequences_daily
+shooting_sequences_daily_far
 
 ```
 
@@ -1099,13 +1097,12 @@ shooting_sequences_daily
 
 ```{r}
 
-shooting_sequences_daily_pseudo %>%        
+shooting_sequences_daily_far %>%        
   ggplot(aes(x = time_diff_hrs, y = dist_to_shoot_m, colour = seq_id)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
   geom_path(alpha = 0.5) +
   scale_y_continuous("Distance to the shooting location (m)") +
-  coord_cartesian(ylim = c(0, 4000)) +
-  labs(title = "5 days before the shooting events") +
+  labs(title = "More than 10 km away from shooting locations") +
   theme_bw() +
   theme(legend.position = "none")
 
@@ -1117,7 +1114,7 @@ shooting_sequences_daily_pseudo %>%
 
 bin_width <- 0.5  # hours
 
-bin_means_psuedo <- shooting_sequences_daily_pseudo %>%
+bin_means_far <- shooting_sequences_daily_far %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
   group_by(bin) %>%
   summarise(
@@ -1130,18 +1127,18 @@ bin_means_psuedo <- shooting_sequences_daily_pseudo %>%
     .groups = "drop"
   )
 
-shooting_sequences_daily_pseudo %>% #filter(name == "Dora the Explorer") %>%
+shooting_sequences_daily_far %>% 
   ggplot(aes(x = time_diff_hrs, y = sl_, colour = seq_id)) +
   geom_path(alpha = 0.5) +
   
   # median and quartiles
-  geom_line(data = bin_means_psuedo, inherit.aes = FALSE,
+  geom_line(data = bin_means_far, inherit.aes = FALSE,
             aes(x = bin, y = q25), colour = "black", linetype = "dashed") +
-  geom_line(data = bin_means_psuedo, inherit.aes = FALSE,
+  geom_line(data = bin_means_far, inherit.aes = FALSE,
             aes(x = bin, y = q50), colour = "black") +
-  geom_line(data = bin_means_psuedo, inherit.aes = FALSE,
+  geom_line(data = bin_means_far, inherit.aes = FALSE,
             aes(x = bin, y = q75), colour = "black", linetype = "dashed") +
-  geom_point(data = bin_means_psuedo, inherit.aes = FALSE,
+  geom_point(data = bin_means_far, inherit.aes = FALSE,
              aes(x = bin, y = q50), colour = "black", size = 2) +
   
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
@@ -1150,7 +1147,7 @@ shooting_sequences_daily_pseudo %>% #filter(name == "Dora the Explorer") %>%
                      breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
   coord_cartesian(ylim = c(0, 750)) +
   scale_colour_viridis_d() +
-  labs(title = "5 days before the shooting events") +
+  labs(title = "More than 10 km away from shooting locations") +
   theme_bw() +
   theme(legend.position = "none") 
 
@@ -1162,9 +1159,10 @@ shooting_sequences_daily_pseudo %>% #filter(name == "Dora the Explorer") %>%
 
 ```{r}
 
-shooting_sequences_daily_both <- shooting_sequences_daily %>% 
+shooting_sequences_daily_all <- shooting_sequences_daily %>% 
   mutate(type = "Observed") %>% 
-  bind_rows(shooting_sequences_daily_pseudo %>% mutate(type = "Pseudo")) 
+  bind_rows(shooting_sequences_daily_pseudo %>% mutate(type = "Pseudo")) %>% 
+  bind_rows(shooting_sequences_daily_far %>% mutate(type = "Far"))
 
 ```
 
@@ -1178,7 +1176,7 @@ shooting_sequences_daily_both <- shooting_sequences_daily %>%
 
 bin_width <- 0.5  # hours
 
-bin_means_both <- shooting_sequences_daily_both %>%
+bin_means_both <- shooting_sequences_daily_all %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
   group_by(type, bin) %>%
   summarise(
@@ -1191,9 +1189,18 @@ bin_means_both <- shooting_sequences_daily_both %>%
     .groups = "drop"
   )
 
-shooting_sequences_daily_both %>%
+# setting the colours for the shooting
+shoot_cols <- c("Observed" = "#D55E00",   # vermillion
+                "Far"      = "#0072B2",   # blue
+                "Pseudo"   = "#009E73")   # bluish green
+
+shoot_labels <- c("Observed" = "Observed shoots",
+                  "Far"      = "Far from shoots",
+                  "Pseudo"   = "5 days before")
+
+shooting_sequences_daily_all %>%
   ggplot(aes(x = time_diff_hrs, y = sl_, colour = type, group = interaction(type, seq_id))) +
-  geom_path(alpha = 0.1) +
+  # geom_path(alpha = 0.1) +
 
   # interquartile range as a ribbon
   geom_ribbon(data = bin_means_both, inherit.aes = FALSE,
@@ -1204,17 +1211,19 @@ shooting_sequences_daily_both %>%
   geom_line(data = bin_means_both, inherit.aes = FALSE,
             aes(x = bin, y = q50, colour = type)) +
   geom_point(data = bin_means_both, inherit.aes = FALSE,
-             aes(x = bin, y = q50, colour = type), size = 2) +
+             aes(x = bin, y = q50, colour = type), size = 1) +
 
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
   scale_y_continuous("Step length (m)") +
   scale_x_continuous("GPS time relative to shooting event (hours)",
-                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
-  coord_cartesian(ylim = c(0, 500)) +
+                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +  
+  scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+  scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+  coord_cartesian(ylim = c(0, 300)) +
   labs(title = "All shooting operations",
        colour = "Shoot", fill = "Shoot") +
   theme_bw() +
-  theme(legend.position = "bottom")
+  theme(legend.position = "right")
 
 ggsave(paste0(outputs_dir, "step_length_shooting_vs_pseudo_all.png"),
        width = 150, height = 100, units = "mm", scale = 1, dpi = 600)
@@ -1231,7 +1240,7 @@ shooting_window_max <- lubridate::as_date("2025 11 10")
 
 bin_width <- 0.5  # hours
 
-bin_means_both <- shooting_sequences_daily_both %>%
+bin_means_both <- shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
   group_by(type, bin) %>%
@@ -1245,10 +1254,10 @@ bin_means_both <- shooting_sequences_daily_both %>%
     .groups = "drop"
   )
 
-shooting_sequences_daily_both %>%
+shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   ggplot(aes(x = time_diff_hrs, y = sl_, colour = type, group = interaction(type, seq_id))) +
-  geom_path(alpha = 0.1) +
+  # geom_path(alpha = 0.1) +
 
   # interquartile range as a ribbon
   geom_ribbon(data = bin_means_both, inherit.aes = FALSE,
@@ -1259,13 +1268,15 @@ shooting_sequences_daily_both %>%
   geom_line(data = bin_means_both, inherit.aes = FALSE,
             aes(x = bin, y = q50, colour = type)) +
   geom_point(data = bin_means_both, inherit.aes = FALSE,
-             aes(x = bin, y = q50, colour = type), size = 2) +
+             aes(x = bin, y = q50, colour = type), size = 1) +
 
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
   scale_y_continuous("Step length (m)") +
   scale_x_continuous("GPS time relative to shooting event (hours)",
                      breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
-  coord_cartesian(ylim = c(0, 500)) +
+  scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+  scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+  coord_cartesian(ylim = c(0, 300)) +
   labs(title = "First shooting operation", subtitle = "2025-11-05 to 2025-11-07", 
        colour = "Shoot", fill = "Shoot") +
   theme_bw() +
@@ -1286,7 +1297,7 @@ shooting_window_max <- lubridate::as_date("2025 12 14")
 
 bin_width <- 0.5  # hours
 
-bin_means_both <- shooting_sequences_daily_both %>%
+bin_means_both <- shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
   group_by(type, bin) %>%
@@ -1300,10 +1311,10 @@ bin_means_both <- shooting_sequences_daily_both %>%
     .groups = "drop"
   )
 
-shooting_sequences_daily_both %>%
+shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   ggplot(aes(x = time_diff_hrs, y = sl_, colour = type, group = interaction(type, seq_id))) +
-  geom_path(alpha = 0.1) +
+  # geom_path(alpha = 0.1) +
 
   # interquartile range as a ribbon
   geom_ribbon(data = bin_means_both, inherit.aes = FALSE,
@@ -1314,13 +1325,15 @@ shooting_sequences_daily_both %>%
   geom_line(data = bin_means_both, inherit.aes = FALSE,
             aes(x = bin, y = q50, colour = type)) +
   geom_point(data = bin_means_both, inherit.aes = FALSE,
-             aes(x = bin, y = q50, colour = type), size = 2) +
+             aes(x = bin, y = q50, colour = type), size = 1) +
 
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
   scale_y_continuous("Step length (m)") +
   scale_x_continuous("GPS time relative to shooting event (hours)",
-                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
-  coord_cartesian(ylim = c(0, 500)) +
+                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) + 
+  scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+  scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+  coord_cartesian(ylim = c(0, 300)) +
   labs(title = "Second shooting operation", subtitle = "2025-11-30 to 2025-12-01", 
        colour = "Shoot", fill = "Shoot") +
   theme_bw() +
@@ -1341,7 +1354,7 @@ shooting_window_max <- lubridate::as_date("2026 05 30")
 
 bin_width <- 0.5  # hours
 
-bin_means_both <- shooting_sequences_daily_both %>%
+bin_means_both <- shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
   group_by(type, bin) %>%
@@ -1355,10 +1368,10 @@ bin_means_both <- shooting_sequences_daily_both %>%
     .groups = "drop"
   )
 
-shooting_sequences_daily_both %>%
+shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   ggplot(aes(x = time_diff_hrs, y = sl_, colour = type, group = interaction(type, seq_id))) +
-  geom_path(alpha = 0.5) +
+  # geom_path(alpha = 0.5) +
 
   # interquartile range as a ribbon
   geom_ribbon(data = bin_means_both, inherit.aes = FALSE,
@@ -1369,13 +1382,15 @@ shooting_sequences_daily_both %>%
   geom_line(data = bin_means_both, inherit.aes = FALSE,
             aes(x = bin, y = q50, colour = type)) +
   geom_point(data = bin_means_both, inherit.aes = FALSE,
-             aes(x = bin, y = q50, colour = type), size = 2) +
+             aes(x = bin, y = q50, colour = type), size = 1) +
 
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
   scale_y_continuous("Step length (m)") +
   scale_x_continuous("GPS time relative to shooting event (hours)",
-                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
-  coord_cartesian(ylim = c(0, 500)) +
+                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) + 
+  scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+  scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+  coord_cartesian(ylim = c(0, 300)) +
   labs(title = "Third shooting operation", subtitle = "2026-05-12 to 2026-05-30", 
        colour = "Shoot", fill = "Shoot") +
   theme_bw() +
@@ -1396,7 +1411,7 @@ shooting_window_max <- lubridate::as_date("2026 08 30")
 
 bin_width <- 0.5  # hours
 
-bin_means_both <- shooting_sequences_daily_both %>%
+bin_means_both <- shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
   group_by(type, bin) %>%
@@ -1410,10 +1425,10 @@ bin_means_both <- shooting_sequences_daily_both %>%
     .groups = "drop"
   )
 
-shooting_sequences_daily_both %>%
+shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   ggplot(aes(x = time_diff_hrs, y = sl_, colour = type, group = interaction(type, seq_id))) +
-  geom_path(alpha = 0.25) +
+  # geom_path(alpha = 0.25) +
 
   # interquartile range as a ribbon
   geom_ribbon(data = bin_means_both, inherit.aes = FALSE,
@@ -1424,13 +1439,15 @@ shooting_sequences_daily_both %>%
   geom_line(data = bin_means_both, inherit.aes = FALSE,
             aes(x = bin, y = q50, colour = type)) +
   geom_point(data = bin_means_both, inherit.aes = FALSE,
-             aes(x = bin, y = q50, colour = type), size = 2) +
+             aes(x = bin, y = q50, colour = type), size = 1) +
 
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
   scale_y_continuous("Step length (m)") +
   scale_x_continuous("GPS time relative to shooting event (hours)",
-                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
-  coord_cartesian(ylim = c(0, 500)) +
+                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) + 
+  scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+  scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+  coord_cartesian(ylim = c(0, 300)) +
   labs(title = "Fourth shooting operation", subtitle = "2026-08-18 to 2026-08-30", 
        colour = "Shoot", fill = "Shoot") +
   theme_bw() +
@@ -1459,7 +1476,7 @@ Here we are looking at whether the pigs changed the habitat that they were in ei
 bin_width <- 0.5  # hours
 z <- qnorm(0.975) # 95% interval
 
-seqs_win <- shooting_sequences_daily_both %>%
+seqs_win <- shooting_sequences_daily_all %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
 
 veg_cols <- grep("^veg_", names(seqs_win), value = TRUE)
@@ -1493,12 +1510,15 @@ for (veg_col in veg_cols) {
     geom_ribbon(aes(ymin = lower, ymax = upper),
                 alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
     geom_line(aes(y = p)) +
-    geom_point(aes(y = p), size = 2) +
+    geom_point(aes(y = p), size = 1) +
     geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
     scale_y_continuous("Proportion of fixes",
                        limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
     scale_x_continuous("GPS time relative to shooting event (hours)",
-                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) + 
+    scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+  # coord_cartesian(ylim = c(0, 1)) +
     labs(title = veg_label,
          subtitle = "All shooting operations",
          colour = "Shoot", fill = "Shoot") +
@@ -1531,7 +1551,7 @@ shooting_window_max <- lubridate::as_date("2025 11 10")
 bin_width <- 0.5  # hours
 z <- qnorm(0.975) # 95% interval
 
-seqs_win <- shooting_sequences_daily_both %>%
+seqs_win <- shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
 
@@ -1566,12 +1586,14 @@ for (veg_col in veg_cols) {
     geom_ribbon(aes(ymin = lower, ymax = upper),
                 alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
     geom_line(aes(y = p)) +
-    geom_point(aes(y = p), size = 2) +
+    geom_point(aes(y = p), size = 1) +
     geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
     scale_y_continuous("Proportion of fixes",
                        limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
     scale_x_continuous("GPS time relative to shooting event (hours)",
                        breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     labs(title = veg_label,
          subtitle = "First shooting: 2025-11-05 to 2025-11-07",
          colour = "Shoot", fill = "Shoot") +
@@ -1604,7 +1626,7 @@ shooting_window_max <- lubridate::as_date("2025 12 14")
 bin_width <- 0.5  # hours
 z <- qnorm(0.975) # 95% interval
 
-seqs_win <- shooting_sequences_daily_both %>%
+seqs_win <- shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
 
@@ -1639,12 +1661,14 @@ for (veg_col in veg_cols) {
     geom_ribbon(aes(ymin = lower, ymax = upper),
                 alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
     geom_line(aes(y = p)) +
-    geom_point(aes(y = p), size = 2) +
+    geom_point(aes(y = p), size = 1) +
     geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
     scale_y_continuous("Proportion of fixes",
                        limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
     scale_x_continuous("GPS time relative to shooting event (hours)",
                        breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     labs(title = veg_label,
          subtitle = "Second shooting operations: 2025-11-30 to 2025-12-01",
          colour = "Shoot", fill = "Shoot") +
@@ -1677,7 +1701,7 @@ shooting_window_max <- lubridate::as_date("2026 05 30")
 bin_width <- 0.5  # hours
 z <- qnorm(0.975) # 95% interval
 
-seqs_win <- shooting_sequences_daily_both %>%
+seqs_win <- shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
 
@@ -1712,12 +1736,14 @@ for (veg_col in veg_cols) {
     geom_ribbon(aes(ymin = lower, ymax = upper),
                 alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
     geom_line(aes(y = p)) +
-    geom_point(aes(y = p), size = 2) +
+    geom_point(aes(y = p), size = 1) +
     geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
     scale_y_continuous("Proportion of fixes",
                        limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
     scale_x_continuous("GPS time relative to shooting event (hours)",
                        breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     labs(title = veg_label,
          subtitle = "Third shooting: May 2026",
          colour = "Shoot", fill = "Shoot") +
@@ -1750,7 +1776,7 @@ shooting_window_max <- lubridate::as_date("2026 08 30")
 bin_width <- 0.5  # hours
 z <- qnorm(0.975) # 95% interval
 
-seqs_win <- shooting_sequences_daily_both %>%
+seqs_win <- shooting_sequences_daily_all %>%
   filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
   mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
 
@@ -1785,12 +1811,14 @@ for (veg_col in veg_cols) {
     geom_ribbon(aes(ymin = lower, ymax = upper),
                 alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
     geom_line(aes(y = p)) +
-    geom_point(aes(y = p), size = 2) +
+    geom_point(aes(y = p), size = 1) +
     geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
     scale_y_continuous("Proportion of fixes",
                        limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
     scale_x_continuous("GPS time relative to shooting event (hours)",
                        breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     labs(title = veg_label,
          subtitle = "Fourth shooting: August 2026",
          colour = "Shoot", fill = "Shoot") +

@@ -301,8 +301,8 @@ div.csl-indent {
 
 
 <div id="cell-1" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:37.751123Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:37.750945Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.557953Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.557509Z&quot;}}" data-execution_count="2">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -334,8 +334,8 @@ torch 2.12.0</code></pre>
 <h2 class="anchored" data-anchor-id="set-random-seed-and-the-device-for-training-the-model">Set random seed and the device for training the model</h2>
 <p>If you have a GPU, this is where it will be specified (automatically).</p>
 <div id="cell-3" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:38.571198Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:38.571076Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.584210Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.583922Z&quot;}}">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Reproducibility — fix random seeds so results are the same on every run.</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># These matter here: make_dataloaders() uses random_split, so without a seed the</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># train/val/test partition changes every run and two training configurations</span></span>
@@ -359,8 +359,8 @@ torch 2.12.0</code></pre>
 <p>If you have cloned/forked/downloaded the GitHub repo (https://github.com/swforrest/deepSSF_package) you shouldn’t need to change these, but for your own analyses you will want to set these to point to where your data is and where you want outputs saved.</p>
 <p><em>All-caps names below are module-level constants — set once here and referenced throughout the notebook without being reassigned. Python has no built-in constant keyword, so capitalisation is the community convention (PEP 8) to signal “do not change this value”.</em></p>
 <div id="cell-5" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:38.585467Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:38.585399Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.587274Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.586952Z&quot;}}">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>DATA_DIR <span class="op">=</span> Path(<span class="st">"data"</span>)  <span class="co"># location of the bundled sample data</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>MAPPING_DIR <span class="op">=</span> Path(<span class="st">"mapping"</span>)  <span class="co"># location of the landcover mapping files</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>CSV_PATH <span class="op">=</span> DATA_DIR <span class="op">/</span> <span class="st">"pigs_east_alligator_steps_covs_20261015.csv"</span>  <span class="co"># GPS tracking data</span></span>
@@ -402,8 +402,8 @@ torch 2.12.0</code></pre>
 <h1>Import data</h1>
 <p>The csv file is imported with a timestamp and an x and y coordinate. In our case the data was already in a projected format that is specific to Australia (EPSG:3112), which is the same crs as the raster data which will be imported.</p>
 <div id="cell-7" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:38.588201Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:38.588148Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.597239Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.596886Z&quot;}}" data-execution_count="8">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>raw_df <span class="op">=</span> pd.read_csv(CSV_PATH)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Raw GPS fixes : </span><span class="sc">{</span><span class="bu">len</span>(raw_df)<span class="sc">:,}</span><span class="ss">"</span>)</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Individuals   : </span><span class="sc">{</span>raw_df[<span class="st">'name'</span>]<span class="sc">.</span>nunique()<span class="sc">}</span><span class="ss">"</span>)</span>
@@ -603,8 +603,8 @@ Individuals   : 19</code></pre>
 <li>The rescaling uses a <strong>single global min/max across all bands</strong> of a file, and computes <code>(data - lo) / hi</code> rather than <code>(data - lo) / (hi - lo)</code>. Our index raster is <code>int16</code> scaled by 10 000 with ±10 000 fill values, so the loaded values span [0, 2] rather than [0, 1] and the three indices are not individually normalised. That is workable (the CNN can rescale internally) but if it hurts training, pre-scale each band yourself and save as <code>.npy</code> — non-<code>.tif</code> paths in <code>LAYER_PATHS</code> are loaded with <code>np.load(..., mmap_mode='r')</code> and left untouched, though at least one real <code>.tif</code> must remain in the dict so the transform can be set.</li>
 </ol>
 <div id="cell-9" class="cell" data-execution_count="6">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>env_layers, raster_transform <span class="op">=</span> deepssf.load_environmental_layers(LAYER_PATHS)</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Layers loaded:"</span>, <span class="bu">list</span>(env_layers.keys()))</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, arr <span class="kw">in</span> env_layers.items():</span>
@@ -633,8 +633,8 @@ Spatial channels: 67</code></pre>
 <h3 class="anchored" data-anchor-id="plot-each-spatial-covariate-with-the-observed-gps-locations-overlaid.">Plot each spatial covariate with the observed GPS locations overlaid.</h3>
 <p>This confirms the raster extent covers the animal’s home range and gives a visual sense of the landscape the model will learn from.</p>
 <div id="cell-11" class="cell" data-execution_count="22">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Flatten env_layers into one (2-D array, label) pair per spatial channel so the</span></span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co"># figure adapts to whatever LAYER_PATHS provides (1 layer of 3 bands, 2 layers of</span></span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 1 band, ...).  Band descriptions come from the GeoTIFF metadata where present.</span></span>
@@ -703,8 +703,8 @@ Spatial channels: 67</code></pre>
 </ul>
 <p>The “1” on column names (x1_, y1_, t1_, etc.) flags them as “start of step” variables; and the “2” in x2_, y2_, t2_ are the corresponding “end of step” values, following the convention of the <code>amt</code> package <span class="citation" data-cites="Signer2019-fi">(<a href="#ref-Signer2019-fi" role="doc-biblioref">Signer et al. 2019</a>)</span>. The last fix for each individual is dropped because no forward step can be formed.</p>
 <div id="cell-13" class="cell" data-execution_count="8">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The CSV is already in amt step format, but prepare_movement_df() expects one row</span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co"># per *fix* and rebuilds the steps itself (it also derives bearing, dt_hour and the</span></span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="co"># cyclic time encodings the model needs).  Point it at the step-start columns and</span></span>
@@ -895,8 +895,8 @@ Spatial channels: 67</code></pre>
 </ul></li>
 </ul>
 <div id="cell-15" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:38.632353Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:38.632282Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.650894Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.650485Z&quot;}}" data-execution_count="9">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>SCALAR_COLS <span class="op">=</span> [<span class="st">"hour_t1_sin1"</span>,</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>               <span class="st">"hour_t1_cos1"</span>, </span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>               <span class="st">"yday_t1_sin1"</span>, </span>
@@ -909,8 +909,8 @@ Spatial channels: 67</code></pre>
 <h2 class="anchored" data-anchor-id="pixel_size"><code>PIXEL_SIZE</code></h2>
 <p>Raster resolution in CRS units (metres here). Read straight off <code>raster_transform</code> rather than typed in: the transform is the authority on the grid the model is trained against, and a hand-entered value that disagrees with it silently mis-scales the movement kernel — which is parameterised in metres — against a grid measured in pixels.</p>
 <div id="cell-17" class="cell" data-execution_count="10">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># transform.a is the cell width, transform.e the (negative) cell height</span></span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>PIXEL_SIZE <span class="op">=</span> <span class="bu">abs</span>(raster_transform.a)</span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -932,8 +932,8 @@ Spatial channels: 67</code></pre>
 <p>The size of the local availability window in cells/pixels.</p>
 <p>The maximum step length that the model will allow is the distance between the centre cell and the nearest edge (in reality some steps may be longer if they are in the corners).</p>
 <div id="cell-19" class="cell" data-execution_count="11">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>WINDOW_SIZE <span class="op">=</span> <span class="dv">51</span></span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Pixel size: </span><span class="sc">{</span>PIXEL_SIZE<span class="sc">}</span><span class="ss"> m  →  window </span><span class="sc">{</span>WINDOW_SIZE<span class="sc">}</span><span class="ss"> px = "</span></span>
@@ -951,8 +951,8 @@ Maximum possible step: 500 m</code></pre>
 <h2 class="anchored" data-anchor-id="batch_size"><code>BATCH_SIZE</code></h2>
 <p>Number of training samples (movement steps) per training mini-batch</p>
 <div id="cell-21" class="cell" data-execution_count="13">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>BATCH_SIZE  <span class="op">=</span> <span class="dv">128</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
@@ -962,8 +962,8 @@ Maximum possible step: 500 m</code></pre>
 <p>How many convolutional layers in the movement subnetwork of the model?</p>
 <p>Each of the convolution layers has a max pooling layer, so more layers will result in greater dimension reduction that will feed into the fully-connected layer that outputs the movement parameters.</p>
 <div id="cell-23" class="cell" data-execution_count="14">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>N_CONV_LAYERS_MOVE <span class="op">=</span> <span class="dv">4</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
@@ -974,8 +974,8 @@ Maximum possible step: 500 m</code></pre>
 <p>These convolution layers do not have max pooling layers, so there is no dimension reduction. More layers will increase the depth of the model and allow for more abstracted features to be identified, but will slow model training/prediction.</p>
 <p>This count includes the final convolution layer, which is the one that collapses the feature maps down to the single-channel habitat selection surface, so the minimum is 1.</p>
 <div id="cell-25" class="cell" data-execution_count="15">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>N_CONV_LAYERS_HAB <span class="op">=</span> <span class="dv">8</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
@@ -984,8 +984,8 @@ Maximum possible step: 500 m</code></pre>
 <h2 class="anchored" data-anchor-id="output_channels"><code>OUTPUT_CHANNELS</code></h2>
 <p>Number of convolutional filters (and therefore feature maps) for <strong>each</strong> convolution layer. More convolutional filters can provide more flexible functions, but will increase the number of parameters and slow down training times.</p>
 <div id="cell-27" class="cell" data-execution_count="16">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>OUTPUT_CHANNELS <span class="op">=</span> <span class="dv">8</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
@@ -995,8 +995,8 @@ Maximum possible step: 500 m</code></pre>
 <p><code>flattened_conv_dim()</code> reproduces exactly what the layers inside <code>ConvJointModel</code> do to the spatial dimensions: * conv (padding=1) keeps the spatial dimension unchanged at each layer * maxpool k=2, s=2 halves the spatial dimension (floor division) at each layer</p>
 <p>Because every movement conv layer is paired with a max pooling layer, this size depends on <code>N_CONV_LAYERS_MOVE</code> — so it has to be recalculated whenever that (or <code>WINDOW_SIZE</code>, or <code>OUTPUT_CHANNELS</code>) changes. It raises an error if the window is pooled away to nothing, which means too many layers for the window size.</p>
 <div id="cell-29" class="cell" data-execution_count="17">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>DENSE_DIM <span class="op">=</span> deepssf.flattened_conv_dim(</span>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    image_dim<span class="op">=</span>WINDOW_SIZE,</span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    n_conv_layers_move<span class="op">=</span>N_CONV_LAYERS_MOVE,</span>
@@ -1014,8 +1014,8 @@ Maximum possible step: 500 m</code></pre>
 <h2 class="anchored" data-anchor-id="filter_steps_by_window"><code>filter_steps_by_window()</code></h2>
 <p>Removes steps whose straight-line displacement exceeds half the spatial window (WINDOW_SIZE × PIXEL_SIZE / 2 metres). Such steps would place the true next location outside the predicted probability map, causing an index error in the loss function.</p>
 <div id="cell-31" class="cell" data-execution_count="18">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>original_data_size <span class="op">=</span> <span class="bu">len</span>(step_df)</span>
 <span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>step_df <span class="op">=</span> deepssf.filter_steps_by_window(</span>
@@ -1060,8 +1060,8 @@ Data reduction: 4,794 (1.9%)</code></pre>
 </ul>
 <p>The layer_paths argument causes the function to re-read the rasters internally, so the DataLoader is independent of the env_layers dict loaded above.</p>
 <div id="cell-33" class="cell" data-execution_count="19">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>dl_train, dl_val, dl_test <span class="op">=</span> deepssf.make_dataloaders(</span>
 <span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>    layer_paths<span class="op">=</span>LAYER_PATHS,</span>
 <span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    window_size<span class="op">=</span>WINDOW_SIZE,</span>
@@ -1097,8 +1097,8 @@ Test  batches : 198</code></pre>
 <p>The <code>px2</code> and <code>py2</code> are the target that the model is trying to predict, and are the pixel values of the next step (with the centre cell being (50, 50))</p>
 <p><em><code>next(iter(dl_train))</code> will call the next batch, which are randomly shuffled, so calling the function again will provide different training samples.</em></p>
 <div id="cell-35" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:38.655763Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:38.655705Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.795800Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.795466Z&quot;}}" data-execution_count="23">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>x1, x2, x3, (px2, py2), _ <span class="op">=</span> <span class="bu">next</span>(<span class="bu">iter</span>(dl_train))</span>
 <span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Spatial   x1 : </span><span class="sc">{</span>x1<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">   (batch × channels × H × W)"</span>)</span>
 <span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Scalars   x2 : </span><span class="sc">{</span>x2<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">   (batch × len(SCALAR_COLS))"</span>)</span>
@@ -1116,8 +1116,8 @@ Next-step px2: [25, 25, 28, 25]  py2: [25, 25, 35, 24]</code></pre>
 <section id="plot-the-first-set-of-tiles-in-the-batch" class="level3">
 <h3 class="anchored" data-anchor-id="plot-the-first-set-of-tiles-in-the-batch">Plot the first set of tiles in the batch</h3>
 <div id="cell-37" class="cell" data-execution_count="25">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the spatial window "tiles" from the first batch: one row per sample, one</span></span>
 <span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="co"># column per raster band.  The centre pixel is the step's start location and the</span></span>
 <span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="co"># cross marks the true next location that the loss function will look up, so this</span></span>
@@ -1187,8 +1187,8 @@ Next-step px2: [25, 25, 28, 25]  py2: [25, 25, 35, 24]</code></pre>
 <p>A thin dict-like container (it is a wrapper around something else rather than storing data) that groups all architecture hyper-parameters so they can be passed to ConvJointModel and logged together.</p>
 <p>This is where the parameters that are passed to the model are set.</p>
 <div id="cell-39" class="cell" data-execution_count="26">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> deepssf.ModelParams({</span>
 <span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"batch_size"</span>:                BATCH_SIZE,</span>
 <span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"image_dim"</span>:                 WINDOW_SIZE,           <span class="co"># spatial window size (pixels)</span></span>
@@ -1223,8 +1223,8 @@ Next-step px2: [25, 25, 28, 25]  py2: [25, 25, 35, 24]</code></pre>
 <p>The deepSSF model! A joint habitat–movement model with two heads: 1. Habitat head — a small CNN applied to the spatial window (env layers + tiled scalars) that outputs a per-pixel log-suitability map. 2. Movement head — a dense MLP (fully-connected layer) that takes the scalar covariates and the previous bearing, and produces parameters for a parametric movement kernel (a mixture of wrapped distributions centred on the current location).</p>
 <p>The two log-probability surfaces are summed pixel-wise to give the joint predicted probability map for the animal’s next step.</p>
 <div id="cell-41" class="cell" data-execution_count="27">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> deepssf.ConvJointModel(params).to(DEVICE)</span>
 <span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>n_params <span class="op">=</span> <span class="bu">sum</span>(p.numel() <span class="cf">for</span> p <span class="kw">in</span> model.parameters())</span>
 <span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Model parameters : </span><span class="sc">{</span>n_params<span class="sc">:,}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -1236,8 +1236,8 @@ Next-step px2: [25, 25, 28, 25]  py2: [25, 25, 35, 24]</code></pre>
 <section id="print-the-model-structure" class="level3">
 <h3 class="anchored" data-anchor-id="print-the-model-structure">Print the model structure</h3>
 <div id="cell-43" class="cell" data-execution_count="28">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(model)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
@@ -1300,8 +1300,8 @@ Next-step px2: [25, 25, 28, 25]  py2: [25, 25, 35, 24]</code></pre>
 <h2 class="anchored" data-anchor-id="negativeloglikeloss"><code>negativeLogLikeLoss</code></h2>
 <p>Scores each predicted probability map against the true next-step pixel index; minimising it pushes probability mass toward observed locations.</p>
 <div id="cell-45" class="cell" data-execution_count="29">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>loss_fn <span class="op">=</span> deepssf.negativeLogLikeLoss(reduction<span class="op">=</span><span class="st">"mean"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
@@ -1322,8 +1322,8 @@ Next-step px2: [25, 25, 28, 25]  py2: [25, 25, 35, 24]</code></pre>
 <p>It also returns a <code>ReduceLROnPlateau</code> scheduler for each optimiser that reduces the learning rate by a factor of <code>scheduler_factor</code> (default = 0.1) if that head’s validation loss does not improve for <code>scheduler_patience</code> epochs (default = 5).</p>
 <p>Note that each scheduler now watches <strong>its own</strong> component of the validation loss. Previously both watched the combined loss, which is dominated by the movement component — so the movement head’s plateau was what cut the habitat learning rate. With that fixed, the two learning rates no longer have to be separated by two orders of magnitude to stop movement from running away with training; start closer together and tune from there.</p>
 <div id="cell-47" class="cell">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>optimisers, schedulers <span class="op">=</span> deepssf.make_optimisers(</span>
 <span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>    model, </span>
 <span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>    lr_habitat<span class="op">=</span><span class="fl">5e-5</span>, </span>
@@ -1344,8 +1344,8 @@ Next-step px2: [25, 25, 28, 25]  py2: [25, 25, 35, 24]</code></pre>
 </ul></li>
 </ul>
 <div id="cell-49" class="cell" data-execution_count="31">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>early_stop <span class="op">=</span> deepssf.EarlyStopping(</span>
 <span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>    patience<span class="op">=</span><span class="dv">10</span>,</span>
 <span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>    verbose<span class="op">=</span><span class="va">True</span>,</span>
@@ -1430,8 +1430,8 @@ Next-step px2: [25, 25, 28, 25]  py2: [25, 25, 35, 24]</code></pre>
 <p>Early stopping ends the current <em>stage</em> and advances to the next, so the final stage’s early stop ends the run.</p>
 <p>Every epoch, a plot of the training and validation loss, and the predicted probability maps (movement, habitat selection and next-step) are written to <code>SNAPSHOT_DIR</code>, which will be turned into a GIF in the next cell.</p>
 <div id="cell-51" class="cell" data-execution_count="32">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>history <span class="op">=</span> deepssf.fit(</span>
 <span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span>model,</span>
 <span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>    image_trim_pixels<span class="op">=</span><span class="dv">4</span>,</span>
@@ -9169,8 +9169,8 @@ Stage 3 converged at epoch 46; moving on.</code></pre>
 <p>Assembles the snapshots in <code>snapshot_dir</code> into an animation so you can see how the predictions evolve as training progresses.</p>
 <p>Display it with <code>IPython.display.Image</code>, which reads the file and embeds the bytes in the notebook’s output. A hand-written <code>&lt;img src="outputs/....gif"&gt;</code> tag does <em>not</em> work here: the notebook’s HTML output is rendered in a sandboxed webview whose base URL is not the notebook’s directory, so a relative path resolves to nothing and you get an empty box. Nothing is generating a still frame — there is simply no image being loaded at all. Embedding also means the animation survives being exported to HTML or shared as a standalone <code>.ipynb</code>.</p>
 <div id="cell-53" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:50.783006Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:50.782935Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:50.844264Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:50.843837Z&quot;}}" data-execution_count="11">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>gif_path <span class="op">=</span> <span class="bu">str</span>(OUTPUT_DIR <span class="op">/</span> <span class="st">"training_progress.gif"</span>)</span>
 <span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>deepssf.create_gif(<span class="bu">str</span>(SNAPSHOT_DIR), gif_path, fps<span class="op">=</span><span class="dv">5</span>)</span>
 <span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Training GIF → </span><span class="sc">{</span>gif_path<span class="sc">}</span><span class="ss">"</span>)</span>
@@ -9193,8 +9193,8 @@ Training GIF → outputs/alphaearth/2026-10-29_1/training_progress.gif</code></p
 <section id="training---loss-across-epochs" class="level2">
 <h2 class="anchored" data-anchor-id="training---loss-across-epochs">Training - loss across epochs</h2>
 <div id="cell-55" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:50.845346Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:50.845277Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:50.902205Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:50.901741Z&quot;}}" data-execution_count="34">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Three panels rather than one: the habitat and movement components move on very</span></span>
 <span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a><span class="co"># different scales, so sharing an axis would flatten the habitat curve into a</span></span>
 <span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a><span class="co"># horizontal line.  x = 0 is the pre-training baseline recorded by fit().</span></span>
@@ -9253,8 +9253,8 @@ Training GIF → outputs/alphaearth/2026-10-29_1/training_progress.gif</code></p
 </ul>
 <p>Mixing them is a deliberate trade: taking the habitat head from a different epoch gives the sharpest habitat surface to <em>map</em>, but the two heads then come from different epochs and the joint model’s likelihood is no longer what either checkpoint recorded. Use it for the landscape predictions below, not for simulating trajectories.</p>
 <div id="cell-57" class="cell" data-execution_count="35">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The joint model — what the simulations further down should use</span></span>
 <span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>ckpt <span class="op">=</span> deepssf.load_checkpoint(<span class="bu">str</span>(OUTPUT_DIR <span class="op">/</span> <span class="st">"best_model.pt"</span>), model)</span>
 <span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"best_model.pt         saved on '</span><span class="sc">{</span>ckpt[<span class="st">'checkpoint_criterion'</span>]<span class="sc">}</span><span class="ss">' "</span></span>
@@ -9294,8 +9294,8 @@ habitat NLL: best 7.5484 at epoch 11, final 7.5591 — a gap of +0.0107 nats
 <p>Both validate_next_step_probs() and simulate_trajectory() call <code>get_landscape(month_index)</code> at each step to fetch the current environmental layers as a list of 2-D tensors.</p>
 <p>With static (non-seasonal) rasters the month_index argument is unused. For seasonal data (e.g.&nbsp;monthly NDVI composites) you would index into a stack of layers here based on the current month.</p>
 <div id="cell-59" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:50.903320Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:50.903258Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:50.915126Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:50.914825Z&quot;}}" data-execution_count="36">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="co"># validate_next_step_probs() and simulate_trajectory() both stack the list returned</span></span>
 <span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a><span class="co"># by get_landscape() along a new channel dimension, so every element must be a *2-D*</span></span>
 <span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a><span class="co"># tensor.  Unbind the band dimension of any multi-band layer so the channel order</span></span>
@@ -9374,8 +9374,8 @@ Testing on 25,296 steps</code></pre>
 </ul>
 <p>Higher values mean the model performed better (there was higher predicted probability at the observed next-step).</p>
 <div id="cell-61" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:50.919665Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:50.919614Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:53.535671Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:53.535265Z&quot;}}" data-execution_count="37">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb52"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Use the last 10 % of steps as the test set (matches the DataLoader split)</span></span>
 <span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a>n_test      <span class="op">=</span> <span class="bu">int</span>(<span class="bu">len</span>(step_df) <span class="op">*</span> <span class="fl">0.1</span>)</span>
 <span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a>test_sample <span class="op">=</span> step_df.iloc[<span class="op">-</span>n_test:].reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
@@ -9411,8 +9411,8 @@ max        0.009300      0.365724        0.491379</code></pre>
 <section id="plot-the-predictive-performance-on-the-held-out-data" class="level2">
 <h2 class="anchored" data-anchor-id="plot-the-predictive-performance-on-the-held-out-data">Plot the predictive performance on the held-out data</h2>
 <div id="cell-63" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:53.536792Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:53.536726Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:53.696983Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:53.696493Z&quot;}}" data-execution_count="39">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb54"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The uniform probability of any cell in the window is 1/(W*H) = 1/(W^2) since W=H.</span></span>
 <span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a>uniform_prob <span class="op">=</span> <span class="dv">1</span><span class="op">/</span>(WINDOW_SIZE <span class="op">**</span> <span class="dv">2</span>)</span>
 <span id="cb54-3"><a href="#cb54-3" aria-hidden="true" tabindex="-1"></a>uniform_prob</span>
