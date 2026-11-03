@@ -121,7 +121,7 @@ pig_gps <- pig_gps %>%
 
 ```
 
-## Update names from metadata 
+## Update names from metadata
 
 ```{r}
 
@@ -161,7 +161,7 @@ pig_gps_cols %>% group_by(id) %>%
 
 ## Setup trajectory
 
-Use the `amt` package to create a trajectory object from the cleaned data. 
+Use the `amt` package to create a trajectory object from the cleaned data.
 
 ```{r}
 #| label: make_track
@@ -196,7 +196,7 @@ pig_all %>%
 
 ```
 
-## Creating a step object 
+## Creating a step object
 
 ```{r}
 
@@ -221,7 +221,7 @@ hist(as.numeric(pig_all_steps$dt_min))
 
 ```
 
-## Calculate the speed for fixes > 5 satellites
+## Calculate the speed for fixes \> 5 satellites
 
 ```{r}
 
@@ -372,7 +372,7 @@ for(i in 1:length(pig_ids)) {
 
 Betty, Brook, Unknown 1 and Doris all appear to go stationary. We'll find where they stop moving and filter out those parts.
 
-### Betty ~ 24th Feb 2026
+### Betty \~ 24th Feb 2026
 
 ```{r}
 
@@ -390,7 +390,7 @@ pig_all_steps %>% filter(name == "Betty" &
 
 ```
 
-### Brook ~ 12th Feb 2026
+### Brook \~ 12th Feb 2026
 
 ```{r}
 
@@ -408,7 +408,7 @@ pig_all_steps %>% filter(name == "Brook" &
 
 ```
 
-### Unknown1 ~ 30th April 2026 
+### Unknown1 \~ 30th April 2026
 
 The jitter patterns appear to still have a daily cycle, so it might just be really restricted movement..? Keep for now.
 
@@ -428,7 +428,7 @@ pig_all_steps %>% filter(name == "Unknown1" &
 
 ```
 
-### Doris ~ 10th March 2026
+### Doris \~ 10th March 2026
 
 ```{r}
 
@@ -535,7 +535,7 @@ pig_aoi %>%
 
 ```
 
-### Use the temperature to check the timezone 
+### Use the temperature to check the timezone
 
 Assuming hotter during the middle hours.
 
@@ -621,7 +621,11 @@ pig_all_steps %>%
 
 ```
 
-# Add meteorological data
+# Daily weather data
+
+## Daily variables
+
+Downloaded from the Bureau of Meteorology (BOM) portal: <https://www.bom.gov.au/climate/data/>. These data are freely available and are daily maximum temperature, minimum temperature, rainfall and solar exposure.
 
 ```{r}
 
@@ -657,11 +661,262 @@ weather_data <- dplyr::left_join(max_temp, min_temp) %>%
 
 ```
 
-## Join with the pig GPS data
+### Join with the pig GPS data
 
 ```{r}
 
 pig_all_steps <- dplyr::left_join(pig_all_steps, weather_data, by = c("date" = "Date")) 
+
+```
+
+# Half-hourly weather data
+
+We requested data from the Bureau of Meterology via this form: <https://reg.bom.gov.au/climate/data/stations/>, which was associated with a fee (outlined [here](https://reg.bom.gov.au/climate/data-services/charges.shtml)). 
+
+We requested half-hourly data to align with the pig GPS locations.
+
+## Oenpelli
+
+### Import data and plot variables
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+oenpelli_weather_full <- read_csv("data/BOM_weather_20261028/HM01X_Data_014310_9999999911162048.txt")
+
+# numeric variables only, dropping the station ID, year and flag columns
+weather_vars <- oenpelli_weather_full %>% 
+  select(where(is.numeric), -`Station Number`, -`Year Month Day Hour Minutes in YYYY`,
+         -`Ceilometer sky clear flag`, -`AWS Flag`) |>
+  names()
+
+cat("::: {.panel-tabset}\n\n")
+
+for(var in weather_vars) {
+
+  p <- ggplot(oenpelli_weather_full, aes(x = .data[[var]])) +
+    geom_histogram(bins = 50, colour = "black") +
+    labs(title = var, x = var, y = "Count") +
+    theme_bw()
+
+  # one tab per weather variable: heading first, then the plot
+  cat("\n\n#### ", var, "\n\n")
+  print(p)
+
+}
+
+cat("\n\n:::\n")
+
+```
+
+### Rename the columns
+
+```{r}
+
+# simplified names for the BOM weather variables (new name = original BOM name), used for both stations
+weather_names <- c(
+  rain_since_9am_mm = "Precipitation since 9am local time in mm",
+  air_temp_c = "Air Temperature in degrees C",
+  wet_bulb_temp_c = "Wet bulb temperature in degrees C",
+  dew_point_temp_c = "Dew point temperature in degrees C",
+  rel_humidity_pct = "Relative humidity in percentage %",
+  wind_speed_kmh = "Wind speed in km/h",
+  wind_dir_deg = "Wind direction in degrees true",
+  max_gust_10min_kmh = "Speed of maximum windgust in last 10 minutes in  km/h",
+  cloud_amount_1 = "Ceilometer cloud amount (of first group)",
+  cloud_height_1_ft = "Ceilometer cloud height (of first group) in feet",
+  cloud_amount_2 = "Ceilometer cloud amount (of second group)",
+  cloud_height_2_ft = "Ceilometer cloud height (of second group) in feet",
+  cloud_amount_3 = "Ceilometer cloud amount (of third group)",
+  cloud_height_3_ft = "Ceilometer cloud height (of third group) in feet",
+  sky_clear_flag = "Ceilometer sky clear flag"
+)
+
+# the original names are used as plot labels, plus a label for the derived half-hourly rain
+weather_labels <- c(weather_names,
+                    rain_30min_mm = "Precipitation in the previous 30 minutes in mm")
+weather_labels[] <- stringr::str_squish(weather_labels) # removes the double space in the gust name
+
+# save the labels for the analysis scripts
+write_csv(tibble::enframe(weather_labels, name = "variable", value = "label"),
+          "data/weather_variable_labels.csv")
+
+oenpelli_weather <- oenpelli_weather_full %>%
+  dplyr::select(-hm, -`Station Number`, -matches("quality", ignore.case = TRUE),
+                -matches("Ceilometer"), -`AWS Flag`, -`#`) %>%
+  # combine the date/time components, which are in local standard time (Darwin has no daylight saving)
+  dplyr::mutate(
+    datetime = lubridate::make_datetime(
+      year = `Year Month Day Hour Minutes in YYYY`,
+      month = as.integer(MM),
+      day = as.integer(DD),
+      hour = as.integer(HH24),
+      min = as.integer(`MI format in Local standard time`),
+      tz = "Australia/Darwin"),
+    .before = 1) %>%
+  dplyr::select(-`Year Month Day Hour Minutes in YYYY`, -MM, -DD, -HH24,
+                -`MI format in Local standard time`) %>%
+  # any_of() as the cloud columns aren't recorded at Oenpelli
+  dplyr::rename(dplyr::any_of(weather_names)) %>%
+  # rain in each half-hour - the since-9am total resets after the 9:00 reading, so group by
+  # rain day (9:30 to 9:00 the next day) and subtract the previous reading
+  dplyr::mutate(rain_day = lubridate::as_date(datetime - lubridate::minutes(570))) %>%
+  dplyr::group_by(rain_day) %>%
+  # round to remove floating point error from the subtraction (gauge resolution is 0.2 mm)
+  dplyr::mutate(rain_30min_mm = round(rain_since_9am_mm - dplyr::lag(rain_since_9am_mm, default = 0), 1),
+                .after = rain_since_9am_mm) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(-rain_day) %>%
+  dplyr::rename_with(~ paste0("onpli_", .x))
+
+oenpelli_weather
+
+```
+
+## Jabiru
+
+### Import data and plot variables
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+jabiru_weather_full <- read_csv("data/BOM_weather_20261028/HM01X_Data_014198_9999999911162048.txt")
+
+# numeric variables only, dropping the station ID, year and flag columns
+weather_vars <- jabiru_weather_full %>% 
+  select(where(is.numeric), -`Station Number`, -`Year Month Day Hour Minutes in YYYY`,
+         -`AWS Flag`)  %>% 
+  names()
+
+cat("::: {.panel-tabset}\n\n")
+
+for(var in weather_vars) {
+
+  p <- ggplot(jabiru_weather_full, aes(x = .data[[var]])) +
+    geom_histogram(bins = 50, colour = "black") +
+    labs(title = var, x = var, y = "Count") +
+    theme_bw()
+
+  # one tab per weather variable: heading first, then the plot
+  cat("\n\n#### ", var, "\n\n")
+  print(p)
+
+}
+
+cat("\n\n:::\n")
+
+```
+
+### Rename the columns
+
+```{r}
+
+jabiru_weather <- jabiru_weather_full %>%
+  dplyr::select(-hm, -`Station Number`, -matches("quality", ignore.case = TRUE),
+                -`AWS Flag`, -`#`) %>%
+  # combine the date/time components, which are in local standard time (Darwin has no daylight saving)
+  dplyr::mutate(
+    datetime = lubridate::make_datetime(
+      year = `Year Month Day Hour Minutes in YYYY`,
+      month = as.integer(MM),
+      day = as.integer(DD),
+      hour = as.integer(HH24),
+      min = as.integer(`MI format in Local standard time`),
+      tz = "Australia/Darwin"),
+    .before = 1) %>%
+  dplyr::select(-`Year Month Day Hour Minutes in YYYY`, -MM, -DD, -HH24,
+                -`MI format in Local standard time`) %>%
+  dplyr::rename(dplyr::all_of(weather_names)) %>%
+  # cloud amounts are coded few < scattered < broken < overcast
+  dplyr::mutate(dplyr::across(starts_with("cloud_amount"),
+                              ~ factor(.x, levels = c("FEW", "SCT", "BKN", "OVC"),
+                                       labels = c("few", "scattered", "broken", "overcast"),
+                                       ordered = TRUE))) %>%
+  # rain in each half-hour - the since-9am total resets after the 9:00 reading, so group by
+  # rain day (9:30 to 9:00 the next day) and subtract the previous reading
+  dplyr::mutate(rain_day = lubridate::as_date(datetime - lubridate::minutes(570))) %>%
+  dplyr::group_by(rain_day) %>%
+  # round to remove floating point error from the subtraction (gauge resolution is 0.2 mm)
+  dplyr::mutate(rain_30min_mm = round(rain_since_9am_mm - dplyr::lag(rain_since_9am_mm, default = 0), 1),
+                .after = rain_since_9am_mm) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(-rain_day) %>%
+  dplyr::rename_with(~ paste0("jabru_", .x))
+
+jabiru_weather
+
+```
+
+## Join both sites to the pig data
+
+The weather observations are exactly on the hour and half-hour, so rounding the pig fix time to the nearest 30 minutes gives the nearest weather observation, which is always within 15 minutes.
+
+```{r}
+
+pig_all_steps <- pig_all_steps %>%
+  dplyr::mutate(weather_datetime = lubridate::round_date(
+    lubridate::with_tz(t1_, tzone = "Australia/Darwin"), unit = "30 mins"),
+    .after = t1_) %>%
+  dplyr::left_join(oenpelli_weather, by = c("weather_datetime" = "onpli_datetime")) %>%
+  dplyr::left_join(jabiru_weather, by = c("weather_datetime" = "jabru_datetime"))
+
+# check the time differences between the pig fixes and the matched weather observations
+summary(abs(as.numeric(difftime(pig_all_steps$t1_, pig_all_steps$weather_datetime, units = "mins"))))
+
+# check for any pig fixes without matching weather data
+sum(is.na(pig_all_steps$onpli_air_temp_c))
+sum(is.na(pig_all_steps$jabru_air_temp_c))
+
+```
+
+## Plot the correlations between the two weather stations
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+# join the two stations by time, so every half-hourly observation is compared
+# (not just those at pig fixes)
+weather_both <- dplyr::inner_join(oenpelli_weather, jabiru_weather,
+                                  by = c("onpli_datetime" = "jabru_datetime"))
+
+# numeric variables recorded at both stations
+shared_vars <- intersect(
+  oenpelli_weather %>% select(where(is.numeric)) %>% names() %>% str_remove("^onpli_"),
+  jabiru_weather %>% select(where(is.numeric)) %>% names() %>% str_remove("^jabru_"))
+
+cat("::: {.panel-tabset}\n\n")
+
+for(var in shared_vars) {
+
+  onpli_var <- paste0("onpli_", var)
+  jabru_var <- paste0("jabru_", var)
+
+  r <- cor(weather_both[[onpli_var]], weather_both[[jabru_var]], use = "complete.obs")
+
+  # same limits on both axes so the 1:1 line runs corner to corner
+  lims <- range(c(weather_both[[onpli_var]], weather_both[[jabru_var]]), na.rm = TRUE)
+
+  p <- ggplot(weather_both, aes(x = .data[[onpli_var]], y = .data[[jabru_var]])) +
+    geom_point(alpha = 0.1, size = 0.5) +
+    geom_abline(intercept = 0, slope = 1, colour = "red", linetype = "dashed") +
+    coord_equal(xlim = lims, ylim = lims) +
+    labs(title = weather_labels[[var]], subtitle = paste0("Pearson's r = ", round(r, 2)),
+         x = "Oenpelli", y = "Jabiru") +
+    theme_bw()
+
+  # one tab per weather variable: heading first, then the plot
+  cat("\n\n### ", var, "\n\n")
+  print(p)
+
+}
+
+cat("\n\n:::\n")
 
 ```
 
@@ -805,8 +1060,7 @@ length(unique(landcover_cropped$Veg_class))
 
 ### Create landcover raster layers for each landcover type
 
-One binary (0/1) layer per vegetation class, on the same grid as the Sentinel-2
-exports so that all of the covariates stack without any resampling.
+One binary (0/1) layer per vegetation class, on the same grid as the Sentinel-2 exports so that all of the covariates stack without any resampling.
 
 ```{r}
 
@@ -1055,7 +1309,6 @@ ggsave("outputs/east_alligator_landcover_combined_wGPS.png",
 terra::writeRaster(landcover_rast_merged, "mapping/landcover_east_alligator.tif", overwrite = TRUE)
 
 ```
-
 
 ### Pull out water (with the NAs)
 

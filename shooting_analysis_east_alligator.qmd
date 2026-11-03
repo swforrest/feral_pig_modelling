@@ -1464,6 +1464,96 @@ ggsave(paste0(outputs_dir, "step_length_shooting_vs_pseudo_fourth.png"),
 
 Here we are looking at whether the pigs changed the habitat that they were in either side of the shooting events. I.e. did they switch from a more open habitat to a more closed habitat for shelter/safety.
 
+### Define colours for the vegetation classes
+
+```{r}
+
+veg_colours <- c(
+  "Dry Rainforest"          = "#1B5E3A",  # dark green
+  "Eucalypt Open Forest"    = "#B5772B",  # deep ochre
+  "Eucalypt Woodland"       = "#E0B65C",  # light ochre
+  "Floodplain Sedgeland"    = "#D6E2A3",  # pale yellow-green
+  "Melaleuca Woodland"      = "#A9CCE3",  # light blue
+  "Melaleuca Open Forest"   = "#5B97BF",  # mid blue
+  "Melaleuca Closed Forest" = "#2B5F8A",  # dark blue
+  "Mangrove"                = "#2A9D8F",  # teal
+  "Mudflat"                 = "#8A7968",  # grey-brown
+  "Water"                   = "#264653"   # dark blue-gray"
+)
+
+```
+
+### Proportions of vegetation classes either side of the shooting events
+
+```{r}
+#| results: asis
+#| fig-width: 7
+#| fig-height: 8
+
+bin_width <- 0.5  # hours
+
+# date windows of each shooting operation (same as the step length plots above)
+shoot_operations <- tribble(
+  ~op,                                      ~file_suffix, ~window_min,           ~window_max,
+  "All shooting operations",                "all",        as_date("2025 01 01"), as_date("2027 01 01"),
+  "First shoot (early Nov 2025)",           "first",      as_date("2025 11 01"), as_date("2025 11 10"),
+  "Second shoot (late Nov/early Dec 2025)", "second",     as_date("2025 11 25"), as_date("2025 12 14"),
+  "Third shoot (May 2026)",                 "third",      as_date("2026 05 12"), as_date("2026 05 30"),
+  "Fourth shoot (Aug 2026)",                "fourth",     as_date("2026 08 12"), as_date("2026 08 30")
+)
+
+cat("::: {.panel-tabset}\n\n")
+
+for (i in seq_len(nrow(shoot_operations))) {
+
+  op_i <- shoot_operations[i, ]
+
+  # proportion of each class per time bin, separately for the observed and control sequences
+  veg_props_shoot <- shooting_sequences_daily_all %>%
+    st_drop_geometry() %>%
+    filter(shoot_time > op_i$window_min & shoot_time < op_i$window_max,
+           !is.na(Veg_class)) %>%
+    mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
+    count(type, bin, Veg_class) %>%
+    # fill classes that weren't used in a bin with zeros so the areas stack properly
+    complete(type, bin, Veg_class, fill = list(n = 0)) %>%
+    group_by(type, bin) %>%
+    mutate(prop = n / sum(n)) %>%
+    ungroup() %>%
+    filter(!is.nan(prop)) %>%
+    mutate(type = factor(type, levels = names(shoot_labels), labels = shoot_labels),
+           Veg_class = factor(Veg_class, levels = names(veg_colours)))
+
+  p <- veg_props_shoot %>%
+    ggplot(aes(x = bin, y = prop, fill = Veg_class)) +
+    geom_area(colour = "white", linewidth = 0.2) +
+
+    # add a line for the time of the shooting event
+    geom_vline(xintercept = 0, colour = "black", linetype = "dashed") +
+
+    scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3),
+                       expand = c(0, 0)) +
+    labs(title = "Vegetation use either side of the shooting events", subtitle = op_i$op,
+         y = "Proportion of steps", fill = "Vegetation class") +
+    scale_fill_manual(values = veg_colours, drop = TRUE) +
+    coord_cartesian(ylim = c(0, 1)) +
+    facet_wrap(~ type, ncol = 1) +
+    theme_bw()
+
+  ggsave(file.path(outputs_veg_dir, paste0("veg_props_shooting_vs_pseudo_", op_i$file_suffix, ".png")),
+         plot = p, width = 150, height = 180, scale = 1.25, units = "mm", dpi = 600)
+
+  # one tab per shooting operation: heading first, then the plot
+  cat("\n\n#### ", op_i$op, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
 ::: {.panel-tabset}
 
 ## All shooting operations
