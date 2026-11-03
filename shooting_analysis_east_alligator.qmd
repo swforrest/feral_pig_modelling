@@ -649,9 +649,9 @@ if (interactive()) {
 
 ```{r}
 
-# find all pig/shooting pairs within 2000 m (returns a list of indices)
+# find all pig/shooting pairs within 1500 m (returns a list of indices)
 # this is irrespective of time at this point
-idx <- st_is_within_distance(pig_all_steps_sf, filtered_shooting_locations, dist = 2000)
+idx <- st_is_within_distance(pig_all_steps_sf, filtered_shooting_locations, dist = 1500)
 
 # turn that into a table of matched pairs
 # this means that this pig GPS location is within 2000 m of this shooting location
@@ -742,7 +742,7 @@ shooting_sequences <- shooting_sequences %>%
   ) %>%
   arrange(seq_id, t1_)
 
-shooting_sequences
+head(shooting_sequences, 100) # printing every row bloats the rendered html
 
 ```
 
@@ -760,7 +760,7 @@ shooting_sequences_daily <- shooting_sequences %>%
   slice_min(shoot_time, n = 1)  %>% 
   ungroup()
 
-shooting_sequences_daily
+head(shooting_sequences_daily, 100)
 
 ```
 
@@ -808,7 +808,7 @@ bin_means <- shooting_sequences_daily %>%
 
 shooting_sequences_daily %>% #filter(name == "Dora the Explorer") %>%
   ggplot(aes(x = time_diff_hrs, y = sl_, colour = seq_id)) +
-  geom_path(alpha = 0.5) +
+  geom_path(alpha = 0.25) +
   
   # mean with error bar
   # geom_errorbar(data = bin_means, inherit.aes = FALSE,
@@ -890,7 +890,7 @@ seqs_pseudo <- seqs_pseudo %>%
   ) %>%
   arrange(seq_id, t1_)
 
-seqs_pseudo
+head(seqs_pseudo, 100)
 
 ```
 
@@ -908,7 +908,7 @@ shooting_sequences_daily_pseudo <- seqs_pseudo %>%
   slice_min(shoot_time, n = 1)  %>% 
   ungroup()
 
-shooting_sequences_daily_pseudo
+head(shooting_sequences_daily_pseudo, 100)
 
 ```
 
@@ -949,7 +949,7 @@ bin_means_psuedo <- shooting_sequences_daily_pseudo %>%
 
 shooting_sequences_daily_pseudo %>% #filter(name == "Dora the Explorer") %>%
   ggplot(aes(x = time_diff_hrs, y = sl_, colour = seq_id)) +
-  geom_path(alpha = 0.5) +
+  geom_path(alpha = 0.25) +
   
   # median and quartiles
   geom_line(data = bin_means_psuedo, inherit.aes = FALSE,
@@ -1071,7 +1071,7 @@ shooting_sequences_far <- shooting_sequences_far %>%
   ) %>%
   arrange(seq_id, t1_)
 
-shooting_sequences_far
+head(shooting_sequences_far, 100)
 
 ```
 
@@ -1089,7 +1089,7 @@ shooting_sequences_daily_far <- shooting_sequences_far %>%
   slice_min(shoot_time, n = 1)  %>% 
   ungroup()
 
-shooting_sequences_daily_far
+head(shooting_sequences_daily_far, 100)
 
 ```
 
@@ -1129,7 +1129,7 @@ bin_means_far <- shooting_sequences_daily_far %>%
 
 shooting_sequences_daily_far %>% 
   ggplot(aes(x = time_diff_hrs, y = sl_, colour = seq_id)) +
-  geom_path(alpha = 0.5) +
+  geom_path(alpha = 0.25) +
   
   # median and quartiles
   geom_line(data = bin_means_far, inherit.aes = FALSE,
