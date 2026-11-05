@@ -43,7 +43,8 @@ library(tidyverse)
 packages <- c("amt", "lubridate",
               "ctmm",
               "terra", "sf",
-              "beepr", "tictoc")
+              "beepr", "tictoc",
+              "leaflet", "viridis")
 walk(packages, require, character.only = T)
 
 # prevent scientific notation in outputs
@@ -88,13 +89,26 @@ head(pig_all)
 
 ```
 
+## Select a subset of the data for prototyping
+
+```{r}
+
+pig_subset <- pig_all %>% filter(month == 11) 
+
+# choose which dataset to use
+pig_data <- pig_subset
+# pig_data <- pig_all
+
+```
+
+
 ## Convert to ctmm telemetry object
 
 ```{r}
 
 # as.telemetry() identifies columns by their Movebank names, so we rename them.
 # x1_/y1_ are in GDA94 / GA Lambert (EPSG:3112), so convert to WGS84 lon/lat
-pig_all_movebank <- pig_all %>%
+pig_data_movebank <- pig_data %>%
   filter(!is.na(x1_), !is.na(y1_), !is.na(t1_)) %>%
   st_as_sf(coords = c("x1_", "y1_"), crs = 3112, remove = FALSE) %>%
   st_transform(crs = 4326) %>%
@@ -108,12 +122,347 @@ pig_all_movebank <- pig_all %>%
   as.data.frame()
 
 # returns a list of telemetry objects, one per individual
-pig_all_ctmm <- as.telemetry(pig_all_movebank,
+pig_data_ctmm <- as.telemetry(pig_data_movebank,
                              timezone = "Australia/Darwin",
                              keep = c("month", "season"))
 
 ```
 
+# Pull out one pig for visualisation and testing
+
+I am using the tutorial at <https://ecoisilva.github.io/AKDE_minireview/code/AKDE_R-tutorial.html> to estimate home ranges over the full tracking period.
+
+## Betty
+
+```{r}
+
+pig_betty <- pig_data_ctmm[["Betty"]]
+plot(pig_betty)
+
+```
+
+## Check range residency
+
+We can see that Betty's variogram is asymptotic after a very short period, indicating that she is range resident.
+
+```{r}
+
+level <- 0.95 # we want to display 95% confidence intervals
+xlim <- c(0,2 %#% "month") # to create a window of 2 months
+
+SVF <- variogram(pig_betty)
+par(mfrow = c(1,2))
+plot(SVF, fraction = 1, level = level)
+# abline(v = 0.1, col = "red", lty = 2) # adding a line at 1 month 
+plot(SVF, xlim = xlim, level = level)
+# abline(v = 0.1, col = "red", lty = 2)
+
+```
+
+## Selecting a movement model
+
+```{r}
+
+# Calculate an automated model guesstimate:
+GUESS1 <- ctmm.guess(pig_betty, interactive = FALSE)
+
+# Automated model selection, starting from GUESS:
+FIT1_ML <- ctmm.select(pig_betty, GUESS1, method = 'ML')
+FIT1_pHREML <- ctmm.select(pig_betty, GUESS1, method = 'pHREML')
+## reminder: it will default to pHREML if no method is specified.
+
+summary(FIT1_ML)
+summary(FIT1_pHREML)
+
+```
+
+### Checking model selection
+
+```{r}
+
+FIT1_pHREML_verbose <- ctmm.select(pig_betty, GUESS1, verbose = TRUE)
+summary(FIT1_pHREML_verbose)
+
+```
+
+## Providing a movement model to the home range estimator
+
+```{r}
+
+# Run an area-corrected AKDE:
+UD1_ML <- akde(pig_betty, FIT1_ML)
+UD1_pHREML <- akde(pig_betty, FIT1_pHREML)
+
+summary(UD1_pHREML)$CI # home range area estimation
+
+```
+
+## Diagnostics
+
+```{r}
+
+summary(UD1_pHREML)$DOF["area"] # effective sample size of Betty
+nrow(pig_betty) # absolute sample size
+
+```
+
+## Weighted AKDE for comparison
+
+```{r}
+
+UD1w_pHREML <- akde(pig_betty, FIT1_pHREML, weights = TRUE)
+summary(UD1w_pHREML)$CI # home range area estimation (weighted)
+
+```
+
+## Plotting estimated home ranges
+
+```{r}
+
+# Creating an extent that includes both UDs at the 95% CI level:
+EXT <- extent(list(UD1_ML, UD1_pHREML, UD1w_pHREML), level = 0.95)
+
+# Plotting pHREML (with and without weights) side-by-side:
+par(mfrow = c(1,2))
+plot(pig_betty, UD = UD1_pHREML, ext = EXT)
+title(expression("pHREML AKDE"["C"]))
+plot(pig_betty, UD = UD1w_pHREML, ext = EXT)
+title(expression("pHREML wAKDE"["C"]))
+
+```
+
+# All pigs
+
+## Nest the telemetry objects
+
+One row per pig, with the telemetry object in a list column. The movement models and home ranges are then added as further list columns.
+
+```{r}
+
+pigs_nested <- tibble(name = names(pig_data_ctmm),
+                      telemetry = pig_data_ctmm)
+
+pigs_nested
+
+```
+
+## Fit movement models and estimate home ranges
+
+Model selection is slow, so the results are saved and re-loaded if they already exist. Delete the file to re-fit.
+
+```{r}
+
+hr_fits_file <- paste0(outputs_dir, "pigs_nested_akde.rds")
+
+if (file.exists(hr_fits_file)) {
+
+  pigs_nested <- readRDS(hr_fits_file)
+
+} else {
+
+  tic()
+  pigs_nested <- pigs_nested %>%
+    mutate(
+      # automated model guesstimate
+      guess = map(telemetry, ~ ctmm.guess(.x, interactive = FALSE)),
+      # model selection (defaults to pHREML)
+      fit = map2(telemetry, guess, ~ ctmm.select(.x, .y)),
+      # area-corrected AKDE
+      ud = map2(telemetry, fit, ~ akde(.x, .y))
+    )
+  toc()
+
+  saveRDS(pigs_nested, hr_fits_file)
+  beep(sound = 2)
+
+}
+
+```
+
+## Summarise the models and home range areas
+
+```{r}
+
+pigs_hr_summary <- pigs_nested %>%
+  mutate(
+    n_locations = map_int(telemetry, nrow),
+    model = map_chr(fit, ~ summary(.x)$name),
+    DOF_area = map_dbl(ud, ~ summary(.x)$DOF["area"]),
+    # 95% home range area and CIs (units are reported in the column name)
+    hr_area = map(ud, ~ {
+      CI <- summary(.x)$CI
+      tibble(units = rownames(CI), low = CI[1, "low"], est = CI[1, "est"], high = CI[1, "high"])
+    })
+  ) %>%
+  dplyr::select(name, n_locations, model, DOF_area, hr_area) %>%
+  unnest(hr_area)
+
+pigs_hr_summary
+
+write_csv(pigs_hr_summary, paste0(outputs_dir, "pigs_hr_summary.csv"))
+
+```
+
+## Plot the home ranges
+
+### Individually with ctmm
+
+```{r}
+#| fig-height: 4
+
+pwalk(list(pigs_nested$name, pigs_nested$telemetry, pigs_nested$ud),
+      function(name, telemetry, ud) {
+        plot(telemetry, UD = ud)
+        title(name)
+      })
+
+```
+
+## Convert to sf and save for QGIS
+
+`as.sf()` returns three polygons per pig for each contour level - the lower CI, the estimate and the upper CI. We extract the 50% (core area) and 95% (home range) contours. Each UD is in ctmm's own local projection, so they are all transformed to EPSG:3112 to match the rest of the data.
+
+```{r}
+
+# home range contours to extract
+contour_levels <- c(0.5, 0.95)
+
+pigs_hr_sf <- pigs_nested %>%
+  dplyr::select(name, ud) %>%
+  # one row per pig per contour level
+  crossing(level_ud = contour_levels) %>%
+  mutate(hr_sf = map2(ud, level_ud, ~ as.sf(.x, level.UD = .y, level = 0.95) %>%
+                        st_transform(crs = 3112))) %>%
+  dplyr::select(name, level_ud, hr_sf) %>%
+  # as.sf already has a 'name' column (e.g. "Betty 95% est"), so rename it
+  mutate(hr_sf = map(hr_sf, ~ rename(.x, contour = name))) %>%
+  unnest(hr_sf) %>%
+  mutate(ci = word(contour, -1)) %>%
+  st_as_sf(crs = 3112)
+
+pigs_hr_sf
+
+# a single GeoPackage with all pigs (filter on 'level_ud' and 'ci' in QGIS)
+st_write(pigs_hr_sf, paste0(outputs_dir, "pigs_hr_akde.gpkg"), delete_dsn = TRUE)
+
+```
+
+### All pigs together
+
+```{r}
+
+pigs_hr_sf %>%
+  filter(ci == "est") %>%
+  ggplot() +
+  geom_point(data = pig_data, aes(x = x1_, y = y1_, colour = name),
+             alpha = 0.1, size = 0.25) +
+  # point estimates of the 50% (dashed) and 95% (solid) contours
+  geom_sf(aes(colour = name, linetype = factor(level_ud)),
+          fill = NA, linewidth = 0.5) +
+  scale_colour_viridis_d(guide = "none") +
+  scale_linetype_manual("Contour", values = c("0.5" = "dashed", "0.95" = "solid"),
+                        labels = c("50%", "95%")) +
+  coord_sf(datum = 3112) +
+  labs(title = "50% and 95% AKDE home ranges", x = "", y = "") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "pigs_hr_akde.png"),
+       width = 150, height = 150, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Plot interactively with leaflet
+
+Each contour level is a separate layer that can be toggled in the layers control. The CIs and GPS fixes are hidden by default.
+
+```{r}
+#| label: leaflet-hr-map
+#| message: false
+#| warning: false
+
+# reproject to WGS84 (EPSG:4326) for leaflet, and add the contour area
+pigs_hr_sf_wgs84 <- pigs_hr_sf %>%
+  mutate(area_km2 = as.numeric(st_area(.)) / 1e6) %>%
+  st_transform(crs = 4326) %>%
+  mutate(popup = paste0("ID: ", name,
+                        "<br>Contour: ", level_ud * 100, "% (", ci, ")",
+                        "<br>Area: ", round(area_km2, 2), " km<sup>2</sup>"))
+
+hr_50_est <- pigs_hr_sf_wgs84 %>% filter(level_ud == 0.5, ci == "est")
+hr_95_est <- pigs_hr_sf_wgs84 %>% filter(level_ud == 0.95, ci == "est")
+hr_95_ci <- pigs_hr_sf_wgs84 %>% filter(level_ud == 0.95, ci != "est")
+
+# GPS fixes (x1_/y1_ are in GDA94 / GA Lambert, EPSG:3112)
+pig_map_pts <- pig_data %>%
+  filter(!is.na(x1_), !is.na(y1_)) %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>%
+  st_transform(crs = 4326)
+
+pal <- colorFactor(viridisLite::viridis(n_distinct(pigs_hr_sf_wgs84$name), option = "H"),
+                   domain = pigs_hr_sf_wgs84$name)
+
+hr_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles(providers$Esri.WorldImagery) %>%
+  addPolygons(data = hr_95_est,
+              color = ~ pal(name), weight = 2, opacity = 1,
+              fillColor = ~ pal(name), fillOpacity = 0.15,
+              popup = ~ popup,
+              highlightOptions = highlightOptions(weight = 4, bringToFront = TRUE),
+              group = "95% home range") %>%
+  addPolygons(data = hr_50_est,
+              color = ~ pal(name), weight = 2, opacity = 1,
+              fillColor = ~ pal(name), fillOpacity = 0.35,
+              popup = ~ popup,
+              highlightOptions = highlightOptions(weight = 4, bringToFront = TRUE),
+              group = "50% core area") %>%
+  addPolylines(data = hr_95_ci,
+               color = ~ pal(name), weight = 1, opacity = 0.8,
+               dashArray = "4 4",
+               popup = ~ popup,
+               group = "95% CIs") %>%
+  # WebGL points, as there can be a lot of fixes
+  leafgl::addGlPoints(data = pig_map_pts,
+                      fillColor = pal(pig_map_pts$name),
+                      fillOpacity = 0.75,
+                      radius = 4,
+                      popup = paste0("ID: ", pig_map_pts$name,
+                                     "<br>Time: ", pig_map_pts$t1_),
+                      group = "GPS fixes") %>%
+  addLegend(position = "bottomright", pal = pal,
+            values = pigs_hr_sf_wgs84$name, title = "Pig ID") %>%
+  addScaleBar(position = "bottomleft",
+              options = scaleBarOptions(imperial = FALSE)) %>%
+  addLayersControl(overlayGroups = c("95% home range", "50% core area",
+                                     "95% CIs", "GPS fixes"),
+                   options = layersControlOptions(collapsed = FALSE)) %>%
+  hideGroup(c("95% CIs", "GPS fixes"))
+
+# save a standalone copy to open in the browser (or share)
+htmlwidgets::saveWidget(hr_map, file.path(outputs_dir, "pigs_hr_akde_map.html"),
+                        selfcontained = TRUE)
+
+hr_map
+
+```
+
+# Monthly space use
+
+## Using MCP
+
+```{r}
+
+
+
+```
+
+## Using ctmm Kriging estimates
+
+```{r}
+
+
+
+```
 
 # References
 
