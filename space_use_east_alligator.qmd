@@ -1,0 +1,129 @@
+---
+title: "Seasonal space use"
+subtitle: "East Alligator"
+author: "Scott Forrest"
+date: "`r Sys.Date()`"
+execute: 
+  cache: false
+  warning: false
+bibliography: paperpile.bib
+toc: true
+number-sections: false
+format: 
+  html:
+    self-contained: false
+    code-fold: true
+    code-summary: "Show code"
+    code-tools: true
+    df-print: paged
+    code-line-numbers: true
+    code-overflow: scroll
+    fig-format: png
+    fig-dpi: 300
+  pdf:
+    fig-format: png
+    fig-dpi: 300
+    geometry: 
+      - top=30mm
+      - left=30mm
+editor:
+  source
+abstract: |
+  Quantifying the space use of the pigs in East Alligator, and how that changes across seasons and for different months of the year. For estimating space use we are using 'occurrence' distributions, which are the probability of finding an animal in a given area at a given time. This is different to 'range' distributions, which are the probability of finding an animal in a given area over a long period of time (i.e. their home range). Occurrence distributions are more appropriate for short-term space use, such as across seasons and months.
+---
+
+# Load packages
+
+```{r}
+#| label: packages
+#| message: false
+#| warning: false
+
+library(tidyverse)
+packages <- c("amt", "lubridate",
+              "ctmm",
+              "terra", "sf",
+              "beepr", "tictoc")
+walk(packages, require, character.only = T)
+
+# prevent scientific notation in outputs
+options(scipen = 999)
+
+```
+
+# Create directories for outputs
+
+```{r}
+
+# general outputs directory
+outputs_dir <- "outputs/east_alligator/space_use/"
+dir.create(outputs_dir, showWarnings = FALSE, recursive = TRUE)
+
+```
+
+# Import GPS tracking data
+
+```{r}
+
+pig_all_steps <- read_csv("data/pigs_east_alligator_steps_covs_20261015.csv")
+
+# Convert timezone after import (resets to UTC)
+pig_all_steps <- pig_all_steps %>% 
+  mutate(
+    t1_  = with_tz(t1_, tzone = "Australia/Darwin"),
+    t2_ = with_tz(t2_, tzone = "Australia/Darwin")
+    )
+
+```
+
+## Get into format for ctmm
+
+```{r}
+
+# keep relevant columns
+pig_all <- pig_all_steps %>% 
+  dplyr::select(name, t1_, x1_, y1_, date, month, season)
+
+head(pig_all)
+
+```
+
+## Convert to ctmm telemetry object
+
+```{r}
+
+# as.telemetry() identifies columns by their Movebank names, so we rename them.
+# x1_/y1_ are in GDA94 / GA Lambert (EPSG:3112), so convert to WGS84 lon/lat
+pig_all_movebank <- pig_all %>%
+  filter(!is.na(x1_), !is.na(y1_), !is.na(t1_)) %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112, remove = FALSE) %>%
+  st_transform(crs = 4326) %>%
+  mutate(location.long = st_coordinates(.)[, 1],
+         location.lat  = st_coordinates(.)[, 2]) %>%
+  st_drop_geometry() %>%
+  transmute(ID = name,
+            timestamp = t1_,
+            location.long, location.lat,
+            month, season) %>%
+  as.data.frame()
+
+# returns a list of telemetry objects, one per individual
+pig_all_ctmm <- as.telemetry(pig_all_movebank,
+                             timezone = "Australia/Darwin",
+                             keep = c("month", "season"))
+
+```
+
+
+# References
+
+::: {#refs}
+:::
+
+# Session Information
+
+```{r}
+
+utils::sessionInfo()
+
+```
