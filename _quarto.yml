@@ -20,7 +20,7 @@ website:
       - text: "Data Preparation"
         href: data_preparation_east_alligator.qmd
       - text: "Space Use"
-        href: space_use_east_alligator.qmd
+        href: space_use_monthly-mcp_east_alligator.qmd
       - text: "Weather Responses"
         href: weather_analysis_acute_east_alligator.qmd
       - text: "Shooting Responses"

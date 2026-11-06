@@ -1,0 +1,1072 @@
+---
+title: "Seasonal space use"
+subtitle: "East Alligator"
+author: "Scott Forrest"
+date: "`r Sys.Date()`"
+execute: 
+  cache: false
+  warning: false
+bibliography: paperpile.bib
+toc: true
+number-sections: false
+format: 
+  html:
+    self-contained: false
+    code-fold: true
+    code-summary: "Show code"
+    code-tools: true
+    df-print: paged
+    code-line-numbers: true
+    code-overflow: scroll
+    fig-format: png
+    fig-dpi: 300
+  pdf:
+    fig-format: png
+    fig-dpi: 300
+    geometry: 
+      - top=30mm
+      - left=30mm
+editor:
+  source
+abstract: |
+  Quantifying the space use of the pigs in East Alligator, and how that changes across seasons and for different months of the year. For estimating space use we are using 'occurrence' distributions, which are the probability of finding an animal in a given area at a given time. This is different to 'range' distributions, which are the probability of finding an animal in a given area over a long period of time (i.e. their home range). Occurrence distributions are more appropriate for short-term space use, such as across seasons and months.
+---
+
+# Load packages
+
+```{r}
+#| label: packages
+#| message: false
+#| warning: false
+
+library(tidyverse)
+packages <- c("amt", "lubridate",
+              "ctmm",
+              "terra", "sf",
+              "beepr", "tictoc",
+              "leaflet", "viridis")
+walk(packages, require, character.only = T)
+
+# prevent scientific notation in outputs
+options(scipen = 999)
+
+```
+
+# Create directories for outputs
+
+```{r}
+
+# general outputs directory
+outputs_dir <- "outputs/east_alligator/space_use/"
+dir.create(outputs_dir, showWarnings = FALSE, recursive = TRUE)
+
+```
+
+# Import GPS tracking data
+
+```{r}
+
+pig_all_steps <- read_csv("data/pigs_east_alligator_steps_covs_20261015.csv")
+
+# Convert timezone after import (resets to UTC)
+pig_all_steps <- pig_all_steps %>% 
+  mutate(
+    t1_  = with_tz(t1_, tzone = "Australia/Darwin"),
+    t2_ = with_tz(t2_, tzone = "Australia/Darwin")
+    )
+
+```
+
+## Get into format for ctmm
+
+```{r}
+
+# keep relevant columns
+pig_all <- pig_all_steps %>% 
+  dplyr::select(name, t1_, x1_, y1_, date, month, season)
+
+head(pig_all)
+
+```
+
+## Select a subset of the data for prototyping
+
+```{r}
+
+pig_subset <- pig_all %>% filter(month == 11) 
+
+# choose which dataset to use
+# pig_data <- pig_subset
+pig_data <- pig_all
+
+```
+
+## Convert to ctmm telemetry object
+
+```{r}
+
+# as.telemetry() identifies columns by their Movebank names, so we rename them.
+# x1_/y1_ are in GDA94 / GA Lambert (EPSG:3112), so convert to WGS84 lon/lat
+pig_data_movebank <- pig_data %>%
+  filter(!is.na(x1_), !is.na(y1_), !is.na(t1_)) %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112, remove = FALSE) %>%
+  st_transform(crs = 4326) %>%
+  mutate(location.long = st_coordinates(.)[, 1],
+         location.lat  = st_coordinates(.)[, 2]) %>%
+  st_drop_geometry() %>%
+  transmute(ID = name,
+            timestamp = t1_,
+            location.long, location.lat,
+            month, season) %>%
+  as.data.frame()
+
+# returns a list of telemetry objects, one per individual
+pig_data_ctmm <- as.telemetry(pig_data_movebank,
+                             timezone = "Australia/Darwin",
+                             keep = c("month", "season"))
+
+```
+
+# AKDE full tracking period
+
+## Nest the telemetry objects
+
+One row per pig, with the telemetry object in a list column. The movement models and home ranges are then added as further list columns.
+
+```{r}
+
+pigs_nested <- tibble(name = names(pig_data_ctmm),
+                      telemetry = pig_data_ctmm)
+
+pigs_nested
+
+```
+
+## Fit movement models and estimate home ranges
+
+Model selection is slow, so the results are saved and re-loaded if they already exist. Delete the file to re-fit.
+
+```{r}
+
+hr_fits_file <- paste0(outputs_dir, "pigs_nested_akde.rds")
+
+if (file.exists(hr_fits_file)) {
+
+  pigs_nested <- readRDS(hr_fits_file)
+
+} else {
+
+  tic()
+  pigs_nested <- pigs_nested %>%
+    mutate(
+      # automated model guesstimate
+      guess = map(telemetry, ~ ctmm.guess(.x, interactive = FALSE)),
+      # model selection (defaults to pHREML)
+      fit = map2(telemetry, guess, ~ ctmm.select(.x, .y)),
+      # area-corrected AKDE
+      ud = map2(telemetry, fit, ~ akde(.x, .y, weights = TRUE))
+    )
+  toc()
+
+  saveRDS(pigs_nested, hr_fits_file)
+  beep(sound = 2)
+
+}
+
+```
+
+## Summarise the models and home range areas
+
+```{r}
+
+pigs_hr_summary <- pigs_nested %>%
+  mutate(
+    n_locations = map_int(telemetry, nrow),
+    model = map_chr(fit, ~ summary(.x)$name),
+    DOF_area = map_dbl(ud, ~ summary(.x)$DOF["area"]),
+    # 95% home range area and CIs (units are reported in the column name)
+    hr_area = map(ud, ~ {
+      CI <- summary(.x)$CI
+      tibble(units = rownames(CI), low = CI[1, "low"], est = CI[1, "est"], high = CI[1, "high"])
+    })
+  ) %>%
+  dplyr::select(name, n_locations, model, DOF_area, hr_area) %>%
+  unnest(hr_area)
+
+pigs_hr_summary
+
+write_csv(pigs_hr_summary, paste0(outputs_dir, "pigs_hr_summary.csv"))
+
+```
+
+## Plot the home ranges
+
+### Individually with ctmm
+
+```{r}
+#| fig-height: 4
+
+pwalk(list(pigs_nested$name, pigs_nested$telemetry, pigs_nested$ud),
+      function(name, telemetry, ud) {
+        plot(telemetry, UD = ud)
+        title(name)
+      })
+
+```
+
+## Convert to sf and save for QGIS
+
+`as.sf()` returns three polygons per pig for each contour level - the lower CI, the estimate and the upper CI. We extract the 50% (core area) and 95% (home range) contours. Each UD is in ctmm's own local projection, so they are all transformed to EPSG:3112 to match the rest of the data.
+
+```{r}
+
+# home range contours to extract
+contour_levels <- c(0.5, 0.95)
+
+pigs_hr_sf <- pigs_nested %>%
+  dplyr::select(name, ud) %>%
+  # one row per pig per contour level
+  crossing(level_ud = contour_levels) %>%
+  mutate(hr_sf = map2(ud, level_ud, ~ as.sf(.x, level.UD = .y, level = 0.95) %>%
+                        st_transform(crs = 3112))) %>%
+  dplyr::select(name, level_ud, hr_sf) %>%
+  # as.sf already has a 'name' column (e.g. "Betty 95% est"), so rename it
+  mutate(hr_sf = map(hr_sf, ~ rename(.x, contour = name))) %>%
+  unnest(hr_sf) %>%
+  mutate(ci = word(contour, -1)) %>%
+  st_as_sf(crs = 3112)
+
+pigs_hr_sf
+
+# a single GeoPackage with all pigs (filter on 'level_ud' and 'ci' in QGIS)
+st_write(pigs_hr_sf, paste0(outputs_dir, "pigs_hr_akde.gpkg"), delete_dsn = TRUE)
+
+```
+
+### All pigs together
+
+```{r}
+
+pigs_hr_sf %>%
+  filter(ci == "est") %>%
+  ggplot() +
+  geom_point(data = pig_data, aes(x = x1_, y = y1_, colour = name),
+             alpha = 0.1, size = 0.25) +
+  # point estimates of the 50% (dashed) and 95% (solid) contours
+  geom_sf(aes(colour = name, linetype = factor(level_ud)),
+          fill = NA, linewidth = 0.5) +
+  scale_colour_viridis_d(guide = "none") +
+  scale_linetype_manual("Contour", values = c("0.5" = "dashed", "0.95" = "solid"),
+                        labels = c("50%", "95%")) +
+  coord_sf(datum = 3112) +
+  labs(title = "50% and 95% AKDE home ranges", x = "", y = "") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+ggsave(paste0(outputs_dir, "pigs_hr_akde.png"),
+       width = 150, height = 150, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Plot interactively with leaflet
+
+Each contour level is a separate layer that can be toggled in the layers control. The CIs and GPS fixes are hidden by default.
+
+```{r}
+#| label: leaflet-hr-map
+#| message: false
+#| warning: false
+
+# reproject to WGS84 (EPSG:4326) for leaflet, and add the contour area
+pigs_hr_sf_wgs84 <- pigs_hr_sf %>%
+  mutate(area_km2 = as.numeric(st_area(.)) / 1e6) %>%
+  st_transform(crs = 4326) %>%
+  mutate(popup = paste0("ID: ", name,
+                        "<br>Contour: ", level_ud * 100, "% (", ci, ")",
+                        "<br>Area: ", round(area_km2, 2), " km<sup>2</sup>"))
+
+hr_50_est <- pigs_hr_sf_wgs84 %>% filter(level_ud == 0.5, ci == "est")
+hr_95_est <- pigs_hr_sf_wgs84 %>% filter(level_ud == 0.95, ci == "est")
+hr_95_ci <- pigs_hr_sf_wgs84 %>% filter(level_ud == 0.95, ci != "est")
+
+# GPS fixes (x1_/y1_ are in GDA94 / GA Lambert, EPSG:3112)
+pig_map_pts <- pig_data %>%
+  filter(!is.na(x1_), !is.na(y1_)) %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>%
+  st_transform(crs = 4326)
+
+pal <- colorFactor(viridisLite::viridis(n_distinct(pigs_hr_sf_wgs84$name), option = "H"),
+                   domain = pigs_hr_sf_wgs84$name)
+
+hr_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles(providers$Esri.WorldImagery) %>%
+  addPolygons(data = hr_95_est,
+              color = ~ pal(name), weight = 2, opacity = 1,
+              fillColor = ~ pal(name), fillOpacity = 0.15,
+              popup = ~ popup,
+              highlightOptions = highlightOptions(weight = 4, bringToFront = TRUE),
+              group = "95% home range") %>%
+  addPolygons(data = hr_50_est,
+              color = ~ pal(name), weight = 2, opacity = 1,
+              fillColor = ~ pal(name), fillOpacity = 0.35,
+              popup = ~ popup,
+              highlightOptions = highlightOptions(weight = 4, bringToFront = TRUE),
+              group = "50% core area") %>%
+  addPolylines(data = hr_95_ci,
+               color = ~ pal(name), weight = 1, opacity = 0.8,
+               dashArray = "4 4",
+               popup = ~ popup,
+               group = "95% CIs") %>%
+  # WebGL points, as there can be a lot of fixes
+  leafgl::addGlPoints(data = pig_map_pts,
+                      fillColor = pal(pig_map_pts$name),
+                      fillOpacity = 0.75,
+                      radius = 4,
+                      popup = paste0("ID: ", pig_map_pts$name,
+                                     "<br>Time: ", pig_map_pts$t1_),
+                      group = "GPS fixes") %>%
+  addLegend(position = "bottomright", pal = pal,
+            values = pigs_hr_sf_wgs84$name, title = "Pig ID") %>%
+  addScaleBar(position = "bottomleft",
+              options = scaleBarOptions(imperial = FALSE)) %>%
+  addLayersControl(overlayGroups = c("95% home range", "50% core area",
+                                     "95% CIs", "GPS fixes"),
+                   options = layersControlOptions(collapsed = FALSE)) %>%
+  hideGroup(c("95% CIs", "GPS fixes"))
+
+# save a standalone copy to open in the browser (or share)
+htmlwidgets::saveWidget(hr_map, file.path(outputs_dir, "pigs_hr_akde_map.html"),
+                        selfcontained = TRUE)
+
+# Embedding the maps inline makes the rendered page (and its _freeze file)
+# too large for GitHub, so when rendering, the saved map is shown in an iframe
+# instead (_quarto.yml copies outputs/**/*.html into the site). When working
+# interactively the map is shown in the viewer as usual.
+embed_map <- function(map, filename, height = 600) {
+  if (interactive()) return(map)
+  htmltools::tags$iframe(src = paste0(outputs_dir, filename),
+                         width = "100%", height = height,
+                         style = "border: none;")
+}
+
+embed_map(hr_map, "pigs_hr_akde_map.html")
+
+```
+
+# AKDE seasonal
+
+Here we estimate weighted AKDE home ranges separately for each season. Each season is kept separate by year (e.g. the 2025 dry season and the 2026 dry season), and the wet season spans the new year (e.g. the 2025-26 wet season).
+
+The model type of each pig (e.g. OUF anisotropic) is taken from the model selected for its full tracking period (`pigs_nested$fit`), so the same type is used for every season of a pig. The parameters are then re-estimated for each season. This matters because AKDE takes its effective sample size (and therefore its CIs) from the movement model, so using the full-period model directly would give each season the certainty of the whole tracking period, and CIs that are too narrow.
+
+The seasons are the same as in the data preparation and weather scripts:
+
+- Wet season: November - April
+  - Early wet: November - January
+  - Late wet: February - April
+- Dry season: May - October
+  - Early dry: May - July
+  - Late dry: August - October
+
+## Settings
+
+```{r}
+
+# minimum number of days with fixes for a pig to be included in a season (~3 months)
+min_days_season <- 90
+
+# and in a sub-season (~1.5 months)
+min_days_subseason <- 45
+
+```
+
+## Functions
+
+These are used for both the seasons and the sub-seasons.
+
+```{r}
+
+# season of each timestamp, labelled by year
+season_id <- function(t) {
+  m <- month(t)
+  y <- year(t)
+  case_when(
+    m %in% 5:10 ~ paste(y, "dry"),
+    m %in% 11:12 ~ paste0(y, "-", sprintf("%02d", (y + 1) %% 100), " wet"),
+    m %in% 1:4 ~ paste0(y - 1, "-", sprintf("%02d", y %% 100), " wet")
+  )
+}
+
+# sub-season of each timestamp, labelled by year
+subseason_id <- function(t) {
+  m <- month(t)
+  y <- year(t)
+  case_when(
+    m %in% 5:7 ~ paste(y, "early dry"),
+    m %in% 8:10 ~ paste(y, "late dry"),
+    m %in% 11:12 ~ paste0(y, "-", sprintf("%02d", (y + 1) %% 100), " early wet"),
+    m == 1 ~ paste0(y - 1, "-", sprintf("%02d", y %% 100), " early wet"),
+    m %in% 2:4 ~ paste(y, "late wet")
+  )
+}
+
+# split one pig's telemetry object into periods (seasons or sub-seasons).
+# Subsetting the telemetry object keeps its projection, so it matches the
+# full-period movement model.
+split_telemetry <- function(tel, period_fun) {
+  t <- with_tz(tel$timestamp, tzone = "Australia/Darwin")
+  periods <- period_fun(t)
+  tibble(period = unique(periods)) %>%
+    mutate(telemetry = map(period, ~ tel[periods == .x, ]),
+           start = map_vec(period, ~ min(t[periods == .x])),
+           n_fixes = map_int(telemetry, nrow),
+           n_days = map_int(period, ~ n_distinct(as_date(t[periods == .x]))))
+}
+
+# fit the movement model to one pig-period and estimate the weighted AKDE.
+# The guess takes the model type from pig_fit (the full-period model), and its
+# parameters as starting values, which are then re-estimated from the period's data
+fit_period_akde <- function(tel, pig_fit) {
+  guess <- ctmm.guess(tel, CTMM = pig_fit, interactive = FALSE)
+  fit <- ctmm.fit(tel, guess, method = "pHREML")
+  list(fit = fit, ud = akde(tel, fit, weights = TRUE))
+}
+
+# one row per pig per period, with the period's movement model and weighted
+# AKDE. This runs in parallel, and the results are saved and re-loaded if they
+# already exist (delete the file to re-run).
+period_akde <- function(pigs_nested, period_fun, min_days, file) {
+
+  if (file.exists(file)) return(readRDS(file))
+
+  pig_periods <- pigs_nested %>%
+    dplyr::select(name, telemetry, pig_fit = fit) %>%
+    mutate(periods = map(telemetry, ~ split_telemetry(.x, period_fun))) %>%
+    dplyr::select(-telemetry) %>%
+    unnest(periods) %>%
+    filter(n_days >= min_days)
+
+  tic()
+  future::plan(future::multisession, workers = max(1, parallelly::availableCores() - 2))
+  results <- furrr::future_map2(
+    pig_periods$telemetry, pig_periods$pig_fit,
+    # a failed fit returns NULL rather than stopping the whole loop
+    possibly(fit_period_akde, otherwise = NULL),
+    .options = furrr::furrr_options(seed = TRUE, packages = "ctmm"),
+    .progress = TRUE)
+  future::plan(future::sequential)
+  toc()
+
+  pig_periods <- pig_periods %>%
+    mutate(fit = map(results, "fit"),
+           ud = map(results, "ud")) %>%
+    dplyr::select(-pig_fit)
+
+  # any pig-periods where the fit failed
+  failed <- pig_periods %>% filter(map_lgl(ud, is.null))
+  if (nrow(failed) > 0) {
+    warning("Fit failed for: ", paste(failed$name, failed$period, collapse = ", "))
+  }
+  pig_periods <- pig_periods %>% filter(!map_lgl(ud, is.null))
+
+  saveRDS(pig_periods, file)
+  beep(sound = 2)
+  pig_periods
+}
+
+# the number of days of each pig in each period, including those that
+# are removed for having fewer than min_days
+period_days <- function(pigs_nested, period_fun) {
+  pigs_nested %>%
+    mutate(periods = map(telemetry, ~ split_telemetry(.x, period_fun))) %>%
+    dplyr::select(name, periods) %>%
+    unnest(periods) %>%
+    dplyr::select(name, period, start, n_fixes, n_days)
+}
+
+# 50% and 95% contours (with CIs) of each pig-period as sf (in EPSG:3112)
+period_contours <- function(pig_periods, levels = contour_levels) {
+
+  # periods ordered by when they start
+  period_levels <- pig_periods %>%
+    summarise(start = min(start), .by = period) %>%
+    arrange(start) %>%
+    pull(period)
+
+  pig_periods %>%
+    dplyr::select(name, period, ud) %>%
+    crossing(level_ud = levels) %>%
+    mutate(hr_sf = map2(ud, level_ud, ~ as.sf(.x, level.UD = .y, level = 0.95) %>%
+                          st_transform(crs = 3112))) %>%
+    dplyr::select(name, period, level_ud, hr_sf) %>%
+    # as.sf already has a 'name' column (e.g. "Betty 95% est"), so rename it
+    mutate(hr_sf = map(hr_sf, ~ rename(.x, contour = name))) %>%
+    unnest(hr_sf) %>%
+    st_as_sf(crs = 3112) %>%
+    mutate(ci = word(contour, -1),
+           period = factor(period, levels = period_levels),
+           area_km2 = as.numeric(st_area(.)) / 1e6) %>%
+    dplyr::select(name, period, level_ud, ci, area_km2)
+}
+
+# area of each pig in each period, with 95% CIs
+plot_period_areas <- function(hr_sf, title) {
+
+  areas <- hr_sf %>%
+    st_drop_geometry() %>%
+    pivot_wider(names_from = ci, values_from = area_km2) %>%
+    mutate(level = paste0(level_ud * 100, "%"))
+
+  dodge <- position_dodge(width = 0.6)
+
+  ggplot(areas, aes(x = period, y = est, colour = name, group = name)) +
+    geom_line(position = dodge, alpha = 0.3, linewidth = 0.3) +
+    geom_errorbar(aes(ymin = low, ymax = high),
+                  position = dodge, width = 0, alpha = 0.5) +
+    geom_point(position = dodge, size = 1) +
+    # mean across pigs
+    stat_summary(aes(group = 1), fun = mean, geom = "point",
+                 colour = "black", shape = 4, size = 3, stroke = 1) +
+    scale_colour_viridis_d(guide = "none") +
+    scale_y_continuous(expression("Area (km"^2*")")) +
+    facet_wrap(~ level, scales = "free_y", ncol = 1) +
+    labs(title = title,
+         subtitle = "Weighted AKDE with 95% CIs. Crosses are the mean across pigs",
+         x = "") +
+    theme_bw()
+}
+
+# leaflet map of the contour point estimates, with radio buttons to choose
+# the period, showing that period's (thinned) GPS fixes
+period_hr_map <- function(hr_sf, pts_sf, title) {
+
+  hr_sf <- hr_sf %>%
+    filter(ci == "est") %>%
+    st_transform(crs = 4326) %>%
+    mutate(popup = paste0("ID: ", name,
+                          "<br>Period: ", period,
+                          "<br>Contour: ", level_ud * 100, "%",
+                          "<br>Area: ", round(area_km2, 2), " km<sup>2</sup>"))
+
+  periods <- levels(droplevels(hr_sf$period))
+
+  # only show the fixes of pig-periods with a home range (i.e. not those
+  # removed for having too few days)
+  pts_sf <- pts_sf %>%
+    semi_join(hr_sf %>% st_drop_geometry() %>%
+                distinct(name, period) %>%
+                mutate(period = as.character(period)),
+              by = c("name", "period"))
+
+  pal <- colorFactor(viridisLite::viridis(n_distinct(pig_all$name), option = "H"),
+                     domain = sort(unique(pig_all$name)))
+
+  m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+    addProviderTiles(providers$Esri.WorldImagery)
+
+  # each period is a 'base group', so the layers control shows radio buttons
+  for (p in periods) {
+    m <- m %>%
+      addCircleMarkers(data = pts_sf %>% filter(period == p),
+                       radius = 2, stroke = FALSE,
+                       fillColor = ~ pal(name), fillOpacity = 0.5,
+                       group = p) %>%
+      addPolygons(data = hr_sf %>% filter(period == p, level_ud == 0.95),
+                  color = ~ pal(name), weight = 2, opacity = 1,
+                  fillColor = ~ pal(name), fillOpacity = 0.1,
+                  popup = ~ popup, group = p) %>%
+      addPolygons(data = hr_sf %>% filter(period == p, level_ud == 0.5),
+                  color = ~ pal(name), weight = 1.5, opacity = 1,
+                  dashArray = "4 4",
+                  fillColor = ~ pal(name), fillOpacity = 0.3,
+                  popup = ~ popup, group = p)
+  }
+
+  m %>%
+    addLegend(position = "bottomright", pal = pal,
+              values = sort(unique(hr_sf$name)), title = "Pig ID") %>%
+    addScaleBar(position = "bottomleft",
+                options = scaleBarOptions(imperial = FALSE)) %>%
+    addControl(paste0("<b>", title, "</b>"), position = "topleft") %>%
+    addLayersControl(baseGroups = periods,
+                     options = layersControlOptions(collapsed = FALSE))
+}
+
+# plot every ith fix per pig on the maps
+thin_by <- 1
+
+```
+
+## Splitting into wet/dry seasons
+
+```{r}
+
+# days of data for each pig in each season
+pig_season_days <- period_days(pigs_nested, season_id)
+
+# pig-seasons that are removed
+pig_season_days %>% filter(n_days < min_days_season)
+
+pigs_seasonal <- period_akde(pigs_nested, season_id, min_days_season,
+                             file = paste0(outputs_dir, "pigs_seasonal_akde.rds"))
+
+pigs_seasonal %>% count(period)
+
+# movement models fitted for each pig (should be one type per pig)
+pigs_seasonal %>%
+  mutate(model = map_chr(fit, ~ summary(.x)$name)) %>%
+  count(name, model)
+
+```
+
+## Seasonal home range areas
+
+```{r}
+
+pigs_hr_seasonal_sf <- period_contours(pigs_seasonal)
+
+pigs_hr_seasonal_area <- pigs_hr_seasonal_sf %>%
+  st_drop_geometry() %>%
+  as_tibble() %>%
+  pivot_wider(names_from = ci, values_from = area_km2) %>%
+  left_join(pigs_seasonal %>%
+              mutate(DOF_area = map_dbl(ud, ~ summary(.x)$DOF["area"])) %>%
+              dplyr::select(name, period, n_fixes, n_days, DOF_area),
+            by = c("name", "period"))
+
+pigs_hr_seasonal_area
+
+write_csv(pigs_hr_seasonal_area, paste0(outputs_dir, "pigs_hr_seasonal_akde_area.csv"))
+
+# a single GeoPackage (filter on 'period', 'level_ud' and 'ci' in QGIS)
+st_write(pigs_hr_seasonal_sf, paste0(outputs_dir, "pigs_hr_seasonal_akde.gpkg"),
+         delete_dsn = TRUE)
+
+```
+
+## Plot the seasonal home range areas
+
+```{r}
+#| fig-height: 7
+
+plot_period_areas(pigs_hr_seasonal_sf, "Seasonal home range areas")
+
+ggsave(paste0(outputs_dir, "pigs_hr_seasonal_akde_area.png"),
+       width = 150, height = 150, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Interactive map of the seasonal home ranges
+
+Select the season with the radio buttons (top right).
+
+```{r}
+#| message: false
+#| warning: false
+
+pig_season_pts <- pig_data %>%
+  filter(!is.na(x1_), !is.na(y1_)) %>%
+  mutate(period = season_id(t1_)) %>%
+  arrange(name, t1_) %>%
+  filter(row_number() %% thin_by == 1, .by = name) %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>%
+  st_transform(crs = 4326)
+
+seasonal_map <- period_hr_map(pigs_hr_seasonal_sf, pig_season_pts,
+                              title = "Seasonal AKDE (50% dashed, 95% solid)")
+
+htmlwidgets::saveWidget(seasonal_map,
+                        file.path(outputs_dir, "pigs_hr_seasonal_akde_map.html"),
+                        selfcontained = TRUE)
+
+embed_map(seasonal_map, "pigs_hr_seasonal_akde_map.html")
+
+```
+
+# AKDE sub-seasonal
+
+## Splitting into early/late wet/dry seasons
+
+```{r}
+
+# days of data for each pig in each sub-season
+pig_subseason_days <- period_days(pigs_nested, subseason_id)
+
+# pig-sub-seasons that are removed
+pig_subseason_days %>% filter(n_days < min_days_subseason)
+
+pigs_subseasonal <- period_akde(pigs_nested, subseason_id, min_days_subseason,
+                                file = paste0(outputs_dir, "pigs_subseasonal_akde.rds"))
+
+pigs_subseasonal %>% count(period)
+
+# movement models fitted for each pig (should be one type per pig)
+pigs_subseasonal %>%
+  mutate(model = map_chr(fit, ~ summary(.x)$name)) %>%
+  count(name, model)
+
+```
+
+## Sub-seasonal home range areas
+
+```{r}
+
+pigs_hr_subseasonal_sf <- period_contours(pigs_subseasonal)
+
+pigs_hr_subseasonal_area <- pigs_hr_subseasonal_sf %>%
+  st_drop_geometry() %>%
+  as_tibble() %>%
+  pivot_wider(names_from = ci, values_from = area_km2) %>%
+  left_join(pigs_subseasonal %>%
+              mutate(DOF_area = map_dbl(ud, ~ summary(.x)$DOF["area"])) %>%
+              dplyr::select(name, period, n_fixes, n_days, DOF_area),
+            by = c("name", "period"))
+
+pigs_hr_subseasonal_area
+
+write_csv(pigs_hr_subseasonal_area, paste0(outputs_dir, "pigs_hr_subseasonal_akde_area.csv"))
+
+# a single GeoPackage (filter on 'period', 'level_ud' and 'ci' in QGIS)
+st_write(pigs_hr_subseasonal_sf, paste0(outputs_dir, "pigs_hr_subseasonal_akde.gpkg"),
+         delete_dsn = TRUE)
+
+```
+
+## Plot the sub-seasonal home range areas
+
+```{r}
+#| fig-height: 7
+
+plot_period_areas(pigs_hr_subseasonal_sf, "Sub-seasonal home range areas")
+
+ggsave(paste0(outputs_dir, "pigs_hr_subseasonal_akde_area.png"),
+       width = 150, height = 150, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Interactive map of the sub-seasonal home ranges
+
+Select the sub-season with the radio buttons (top right).
+
+```{r}
+#| message: false
+#| warning: false
+
+pig_subseason_pts <- pig_data %>%
+  filter(!is.na(x1_), !is.na(y1_)) %>%
+  mutate(period = subseason_id(t1_)) %>%
+  arrange(name, t1_) %>%
+  filter(row_number() %% thin_by == 1, .by = name) %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>%
+  st_transform(crs = 4326)
+
+subseasonal_map <- period_hr_map(pigs_hr_subseasonal_sf, pig_subseason_pts,
+                                 title = "Sub-seasonal AKDE (50% dashed, 95% solid)")
+
+htmlwidgets::saveWidget(subseasonal_map,
+                        file.path(outputs_dir, "pigs_hr_subseasonal_akde_map.html"),
+                        selfcontained = TRUE)
+
+embed_map(subseasonal_map, "pigs_hr_subseasonal_akde_map.html")
+
+```
+
+# Monthly space use
+
+Here we estimate space use separately for each pig in each calendar month, keeping the same month in different years separate (e.g. October 2025 and October 2026). This uses all of the data (`pig_all`) rather than the prototyping subset.
+
+## Settings
+
+Pig-months with only a few days of data (e.g. when the collar was deployed or dropped off part-way through a month) will have artificially small areas, so they are removed.
+
+```{r}
+
+# minimum number of days with fixes for a pig-month to be included
+min_days <- 20
+
+# contour levels (50% core area and 95% home range)
+contour_levels <- c(0.5, 0.95)
+
+# set to a number to only fit the first n pig-months with ctmm (for testing),
+# or NA to fit them all
+n_test <- NA
+
+```
+
+## Split the data into pig-months
+
+```{r}
+
+pig_monthly <- pig_all %>%
+  filter(!is.na(x1_), !is.na(y1_), !is.na(t1_)) %>%
+  mutate(year_month = format(t1_, "%Y-%m"),
+         month_date = floor_date(as_date(t1_), "month")) %>%
+  nest(data = -c(name, year_month, month_date)) %>%
+  mutate(n_fixes = map_int(data, nrow),
+         n_days = map_int(data, ~ n_distinct(as_date(.x$t1_)))) %>%
+  arrange(name, month_date)
+
+# pig-months that are removed
+pig_monthly %>% filter(n_days < min_days) %>% dplyr::select(-data)
+
+pig_monthly <- pig_monthly %>% filter(n_days >= min_days)
+
+# number of pig-months for each month
+pig_monthly %>% count(month_date)
+
+```
+
+## Using MCP
+
+Minimum convex polygons from the `amt` package. The 95% MCP excludes the 5% of fixes furthest from the centroid.
+
+```{r}
+
+hr_monthly_mcp_sf <- pig_monthly %>%
+  mutate(track = map(data, ~ make_track(.x, x1_, y1_, t1_, crs = 3112)),
+         mcp_sf = map(track, ~ hr_mcp(.x, levels = contour_levels) %>%
+                        hr_isopleths())) %>%
+  dplyr::select(name, year_month, month_date, mcp_sf) %>%
+  unnest(mcp_sf) %>%
+  st_as_sf(crs = 3112) %>%
+  mutate(method = "MCP",
+         level_ud = level,
+         area_km2 = as.numeric(area) / 1e6) %>%
+  dplyr::select(name, year_month, month_date, method, level_ud, area_km2)
+
+hr_monthly_mcp_sf
+
+```
+
+## Save the monthly contours
+
+```{r}
+
+# a single GeoPackage (filter on 'method', 'year_month', 'level_ud' and 'ci' in QGIS)
+st_write(hr_monthly_mcp_sf, paste0(outputs_dir, "pigs_hr_monthly_mcp.gpkg"), delete_dsn = TRUE)
+
+hr_monthly_mcp_area <- hr_monthly_mcp_sf %>%
+  st_drop_geometry() %>%
+  as_tibble()
+
+write_csv(hr_monthly_mcp_area, paste0(outputs_dir, "pigs_hr_monthly_mcp_area.csv"))
+
+```
+
+## Monthly area through time
+
+The background shading shows the season of each month.
+
+```{r}
+#| fig-height: 8
+
+# season of each month (the most common season label of the fixes in that month)
+month_seasons <- pig_monthly %>%
+  dplyr::select(month_date, data) %>%
+  unnest(data) %>%
+  count(month_date, season) %>%
+  slice_max(n, by = month_date, with_ties = FALSE) %>%
+  mutate(xmin = month_date, xmax = month_date %m+% months(1))
+
+# areas are plotted at the middle of each month
+hr_monthly_area_est <- hr_monthly_mcp_area %>%
+  mutate(level = paste0(level_ud * 100, "%"),
+         method = factor(method, levels = "MCP"),
+         month_mid = month_date + days(14))
+
+hr_monthly_area_mean <- hr_monthly_area_est %>%
+  summarise(area_km2 = mean(area_km2), .by = c(method, level, month_mid))
+
+ggplot() +
+  geom_rect(data = month_seasons,
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = season),
+            alpha = 0.15) +
+  geom_line(data = hr_monthly_area_est,
+            aes(x = month_mid, y = area_km2, colour = name),
+            alpha = 0.5, linewidth = 0.3) +
+  geom_point(data = hr_monthly_area_est,
+             aes(x = month_mid, y = area_km2, colour = name),
+             alpha = 0.5, size = 0.75) +
+  # mean across pigs
+  geom_line(data = hr_monthly_area_mean,
+            aes(x = month_mid, y = area_km2), linewidth = 1) +
+  scale_colour_viridis_d(guide = "none") +
+  scale_fill_manual("Season", values = c("dry" = "orange", "wet" = "blue")) +
+  scale_x_date("", date_breaks = "2 months", date_labels = "%b\n%Y") +
+  scale_y_continuous(expression("Area (km"^2*")")) +
+  coord_cartesian(expand = FALSE, ylim = c(0,20)) +
+  facet_grid(method ~ level, scales = "free_y") +
+  labs(title = "Monthly space use of each pig",
+       subtitle = "Black line is the mean across pigs") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+ggsave(paste0(outputs_dir, "pigs_hr_monthly_area.png"),
+       width = 150, height = 180, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+## Interactive map with a month slider
+
+The slider (top right) steps through the months, showing that month's contours and GPS fixes for each pig. The fixes are thinned for display, and can be turned off with the checkbox.
+
+```{r}
+#| label: leaflet-monthly-map
+#| message: false
+#| warning: false
+
+# plot every ith fix per pig
+thin_by <- 4
+
+pig_monthly_pts <- pig_monthly %>%
+  dplyr::select(name, year_month, data) %>%
+  unnest(data) %>%
+  arrange(name, t1_) %>%
+  filter(row_number() %% thin_by == 1, .by = name) %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>%
+  st_transform(crs = 4326)
+
+# The slider shows/hides the leaflet groups for each month (one group for
+# the contours and one for the fixes) via the map's layerManager
+month_slider_js <- r"--[
+function(el, x, d) {
+  var map = this;
+  var months = [].concat(d.months), labels = [].concat(d.labels);
+  var state = { i: 0, pts: true, timer: null };
+
+  // the layerManager isn't always attached yet when onRender runs, so look
+  // it up each time (and the first update is deferred below)
+  function setGroup(g, on) {
+    var mgr = map.layerManager || HTMLWidgets.find('#' + el.id).getMap().layerManager;
+    var lg = mgr.getLayerGroup(g, false);
+    if (!lg) return;
+    if (on) map.addLayer(lg); else map.removeLayer(lg);
+  }
+
+  function update() {
+    months.forEach(function(m, j) {
+      setGroup(m, j === state.i);
+      setGroup(m + '_fixes', j === state.i && state.pts);
+    });
+    lab.innerHTML = labels[state.i];
+    slider.value = state.i;
+  }
+
+  var ctrl = L.control({ position: 'topright' });
+  var div, slider, lab, play, chk;
+  ctrl.onAdd = function() {
+    div = L.DomUtil.create('div', 'leaflet-bar');
+    div.style.cssText = 'background:white;padding:6px 10px;font:13px sans-serif;width:240px';
+    div.innerHTML = '<div style="font-weight:bold;margin-bottom:4px">' + d.title + '</div>' +
+      '<div class="ms-lab" style="font-size:15px;margin-bottom:4px"></div>' +
+      '<input class="ms-slider" type="range" min="0" step="1" style="width:100%">' +
+      '<div style="margin-top:4px"><button class="ms-play">Play</button> ' +
+      '<label><input class="ms-chk" type="checkbox" checked> GPS fixes</label></div>';
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.disableScrollPropagation(div);
+    return div;
+  };
+  ctrl.addTo(map);
+
+  slider = div.querySelector('.ms-slider');
+  lab = div.querySelector('.ms-lab');
+  play = div.querySelector('.ms-play');
+  chk = div.querySelector('.ms-chk');
+  slider.max = months.length - 1;
+
+  slider.addEventListener('input', function() { state.i = +slider.value; update(); });
+  chk.addEventListener('change', function() { state.pts = chk.checked; update(); });
+  play.addEventListener('click', function() {
+    if (state.timer) {
+      clearInterval(state.timer); state.timer = null; play.innerHTML = 'Play';
+    } else {
+      play.innerHTML = 'Pause';
+      state.timer = setInterval(function() {
+        state.i = (state.i + 1) % months.length; update();
+      }, d.interval);
+    }
+  });
+
+  setTimeout(update, 0);
+}
+]--"
+
+# map of monthly contours (point estimates) with a month slider
+monthly_hr_map <- function(hr_sf, pts_sf, title, interval_ms = 1500) {
+
+  hr_sf <- hr_sf %>%
+    filter(ci == "est") %>%
+    st_transform(crs = 4326) %>%
+    mutate(popup = paste0("ID: ", name,
+                          "<br>Month: ", format(month_date, "%b %Y"),
+                          "<br>Contour: ", level_ud * 100, "%",
+                          "<br>Area: ", round(area_km2, 2), " km<sup>2</sup>"))
+
+  months <- sort(unique(hr_sf$year_month))
+  pal <- colorFactor(viridisLite::viridis(n_distinct(pig_all$name), option = "H"),
+                     domain = sort(unique(pig_all$name)))
+
+  m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+    addProviderTiles(providers$Esri.WorldImagery)
+
+  for (mon in months) {
+    hr_95 <- hr_sf %>% filter(year_month == mon, level_ud == 0.95)
+    hr_50 <- hr_sf %>% filter(year_month == mon, level_ud == 0.5)
+    pts <- pts_sf %>% filter(year_month == mon)
+
+    m <- m %>%
+      addCircleMarkers(data = pts, radius = 2, stroke = FALSE,
+                       fillColor = ~ pal(name), fillOpacity = 0.6,
+                       group = paste0(mon, "_fixes")) %>%
+      addPolygons(data = hr_95, color = ~ pal(name), weight = 2, opacity = 1,
+                  fillColor = ~ pal(name), fillOpacity = 0.1,
+                  popup = ~ popup, group = mon) %>%
+      addPolygons(data = hr_50, color = ~ pal(name), weight = 1.5, opacity = 1,
+                  dashArray = "4 4",
+                  fillColor = ~ pal(name), fillOpacity = 0.3,
+                  popup = ~ popup, group = mon)
+  }
+
+  m %>%
+    addLegend(position = "bottomright", pal = pal,
+              values = sort(unique(hr_sf$name)), title = "Pig ID") %>%
+    addScaleBar(position = "bottomleft",
+                options = scaleBarOptions(imperial = FALSE)) %>%
+    htmlwidgets::onRender(month_slider_js,
+                          data = list(months = months,
+                                      labels = format(ym(months), "%B %Y"),
+                                      title = title,
+                                      interval = interval_ms))
+}
+
+```
+
+### MCP
+
+```{r}
+#| message: false
+#| warning: false
+
+monthly_mcp_map <- monthly_hr_map(hr_monthly_mcp_sf, pig_monthly_pts,
+                                  title = "Monthly MCP (50% dashed, 95% solid)")
+
+htmlwidgets::saveWidget(monthly_mcp_map,
+                        file.path(outputs_dir, "pigs_hr_monthly_mcp_map.html"),
+                        selfcontained = TRUE)
+
+embed_map(monthly_mcp_map, "pigs_hr_monthly_mcp_map.html")
+
+```
+
+# References
+
+::: {#refs}
+:::
+
+# Session Information
+
+```{r}
+
+utils::sessionInfo()
+
+```

@@ -974,17 +974,6 @@ ggsave(file.path(outputs_veg_dir, "veg_props_wet_season.png"),
 
 ```{r}
 
-pig_all_steps <- pig_all_steps %>%
-  mutate(season2 = case_when(
-    season == "dry" & month %in% c(5, 6, 7) ~ "early dry",
-    season == "dry" & month %in% c(8, 9, 10) ~ "late dry",
-    season == "wet" & month %in% c(11, 12, 1) ~ "early wet",
-    season == "wet" & month %in% c(2, 3, 4) ~ "late wet",
-    TRUE ~ NA_character_,
-  ), 
-  .after = season
-  )
-
 # proportion of each class per time bin
 veg_props2 <- pig_all_steps %>%
   count(day_frac_bin, season2, Veg_class) %>%

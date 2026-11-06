@@ -72,15 +72,7 @@ pig_all_steps <- read_csv("data/pigs_east_alligator_steps_covs_20261015.csv")
 pig_all_steps <- pig_all_steps %>% 
   mutate(
     t1_  = with_tz(t1_, tzone = "Australia/Darwin"),
-    t2_ = with_tz(t2_, tzone = "Australia/Darwin"),
-    season2 = case_when(
-      season == "dry" & month %in% c(5, 6, 7) ~ "early dry",
-      season == "dry" & month %in% c(8, 9, 10) ~ "late dry",
-      season == "wet" & month %in% c(11, 12, 1) ~ "early wet",
-      season == "wet" & month %in% c(2, 3, 4) ~ "late wet",
-      TRUE ~ NA_character_
-      ), 
-    .after = season
+    t2_ = with_tz(t2_, tzone = "Australia/Darwin")
     )
 
 ```
