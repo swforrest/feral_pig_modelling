@@ -995,7 +995,7 @@ function(el, x, d) {
 monthly_hr_map <- function(hr_sf, pts_sf, title, interval_ms = 1500) {
 
   hr_sf <- hr_sf %>%
-    filter(ci == "est") %>%
+    # filter(ci == "est") %>%
     st_transform(crs = 4326) %>%
     mutate(popup = paste0("ID: ", name,
                           "<br>Month: ", format(month_date, "%b %Y"),
