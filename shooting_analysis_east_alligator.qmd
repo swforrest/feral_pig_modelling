@@ -649,12 +649,12 @@ if (interactive()) {
 
 ```{r}
 
-# find all pig/shooting pairs within 1500 m (returns a list of indices)
+# find all pig/shooting pairs within x m (returns a list of indices)
 # this is irrespective of time at this point
-idx <- st_is_within_distance(pig_all_steps_sf, filtered_shooting_locations, dist = 1500)
+idx <- st_is_within_distance(pig_all_steps_sf, filtered_shooting_locations, dist = 500)
 
 # turn that into a table of matched pairs
-# this means that this pig GPS location is within 2000 m of this shooting location
+# this means that this pig GPS location is within x m of this shooting location
 pairs <- tibble(
   pig_row   = rep(seq_along(idx), lengths(idx)),
   shoot_row = unlist(idx)
@@ -669,7 +669,7 @@ pairs$dist_m <- as.numeric(
 
 # attach the attributes from both objects
 hits <- bind_cols(
-  # keep only the GPS locations that are within 2000 m of a shooting location
+  # keep only the GPS locations that are within x m of a shooting location
   pig_all_steps_sf[pairs$pig_row, ],
   filtered_shooting_locations[pairs$shoot_row, ] %>% st_drop_geometry(), #%>% rename_with(~ paste0("shoot_", .x)),
   dist_m = pairs$dist_m
@@ -691,7 +691,7 @@ hits <- hits %>%
 
 For each shooting location and each pig, take the pig GPS location that is nearest in time to the shooting event.
 
-From these, we have 182 instances where a pig was within 2000 m and 3 hours of a shooting event. What we have left in this dataframe is the 'focal shooting location', meaning it was nearest in time to the shooting event for that pig. 
+For instance, within 3 hours either side of the shooting times, we have 182 instances where a pig was within 2000 m of a shooting event. What we have left in this dataframe is the 'focal shooting location', meaning it was nearest in time to the shooting event for that pig. 
 
 Using the focal shooting location, we will extract a sequence of locations from before and after the shooting event, to see if there is a change in behaviour.
 
@@ -704,13 +704,19 @@ hits_nearest_time <- hits %>%
 
 hits_nearest_time
 
+# there are four periods with a couple days of shooting
+ggplot(hits_nearest_time, aes(x = shoot_time)) +
+  geom_histogram(bins = 30, fill = "red", colour = "black") +
+  scale_x_datetime("Time difference between pig GPS location and shooting event (hours)") +
+  theme_bw()
+
 ```
 
 ### Extract pig GPS locations either side of the focal shoot location
 
 ```{r}
 
-shoot_focal_window <- 12 # time either side of focal shooting location (in hours)
+shoot_focal_window <- 24 # time either side of focal shooting location (in hours)
 
 # one row per pig/shooting instance, with the temporal window to filter the data by
 focal <- hits_nearest_time %>%
@@ -723,8 +729,21 @@ focal <- hits_nearest_time %>%
 shoot_geom <- filtered_shooting_locations %>%
   select(shoot_id)
 
+# distance (m) from each fix to the pig's own GPS fix nearest in time to the shoot
+# (i.e. where the pig was at t = 0), so every sequence starts from 0 at the shoot.
+# Staying near 0 after the shoot suggests bunkering down, rapid increases suggest fleeing
+add_dist_to_t0 <- function(seqs) {
+  seqs %>%
+    group_by(seq_id) %>%
+    mutate(
+      dist_to_t0_m = as.numeric(
+        st_distance(geometry, geometry[which.min(abs(time_diff_hrs))]))
+    ) %>%
+    ungroup()
+}
+
 # pull every GPS fix for that pig inside the window
-shooting_sequences <- pig_all_steps_sf %>% 
+shooting_sequences <- pig_all_steps_sf %>%
   inner_join(focal,
              by = join_by(name, between(t1_, win_start, win_end)),
              relationship = "many-to-many")
@@ -740,9 +759,10 @@ shooting_sequences <- shooting_sequences %>%
     period = if_else(time_diff_hrs < 0, "baseline", "response"),
     seq_id = paste(name, shoot_id, sep = "_")
   ) %>%
-  arrange(seq_id, t1_)
+  arrange(seq_id, t1_) %>%
+  add_dist_to_t0()
 
-head(shooting_sequences, 100) # printing every row bloats the rendered html
+head(shooting_sequences, 10) # printing every row bloats the rendered html
 
 ```
 
@@ -760,7 +780,7 @@ shooting_sequences_daily <- shooting_sequences %>%
   slice_min(shoot_time, n = 1)  %>% 
   ungroup()
 
-head(shooting_sequences_daily, 100)
+head(shooting_sequences_daily, 10)
 
 ```
 
@@ -777,6 +797,23 @@ shooting_sequences_daily %>%
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
   geom_path(alpha = 0.5) +
   scale_y_continuous("Distance to the shooting location (m)") +
+  labs(title = "Observed shooting events") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+## Distance from the pig's location at the time of shooting
+
+Here the distance is measured from each pig's own GPS location nearest in time to the shooting event, so every sequence is 0 at t = 0. Values that stay near 0 after the shoot suggest the pig bunkered down, and values that increase rapidly suggest it fled.
+
+```{r}
+
+shooting_sequences_daily %>%
+  ggplot(aes(x = time_diff_hrs, y = dist_to_t0_m, colour = seq_id)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  geom_path(alpha = 0.5) +
+  scale_y_continuous("Distance from location at time of shooting (m)") +
   labs(title = "Observed shooting events") +
   theme_bw() +
   theme(legend.position = "none")
@@ -888,9 +925,10 @@ seqs_pseudo <- seqs_pseudo %>%
     period = if_else(time_diff_hrs < 0, "baseline", "response"),
     seq_id = paste(name, shoot_id, sep = "_")
   ) %>%
-  arrange(seq_id, t1_)
+  arrange(seq_id, t1_) %>%
+  add_dist_to_t0()
 
-head(seqs_pseudo, 100)
+head(seqs_pseudo, 10)
 
 ```
 
@@ -908,7 +946,7 @@ shooting_sequences_daily_pseudo <- seqs_pseudo %>%
   slice_min(shoot_time, n = 1)  %>% 
   ungroup()
 
-head(shooting_sequences_daily_pseudo, 100)
+head(shooting_sequences_daily_pseudo, 10)
 
 ```
 
@@ -922,6 +960,15 @@ shooting_sequences_daily_pseudo %>%
   geom_path(alpha = 0.5) +
   scale_y_continuous("Distance to the shooting location (m)") +
   coord_cartesian(ylim = c(0, 4000)) +
+  labs(title = "5 days before the shooting events") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+shooting_sequences_daily_pseudo %>%
+  ggplot(aes(x = time_diff_hrs, y = dist_to_t0_m, colour = seq_id)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  geom_path(alpha = 0.5) +
+  scale_y_continuous("Distance from location at time of shooting (m)") +
   labs(title = "5 days before the shooting events") +
   theme_bw() +
   theme(legend.position = "none")
@@ -979,6 +1026,8 @@ Here we get locations for pigs that have locations at the same time as the shoot
 
 ```{r}
 
+shoot_distance <- 10000  # metres
+
 # add an ID to the shooting locations
 shoot <- filtered_shooting_locations %>%
   mutate(shoot_id = row_number())
@@ -1015,7 +1064,7 @@ hist(pairs$dist_m)
 
 # fixes more than 10 km from a shooting event while it was happening
 far_during_shooting <- pairs %>%
-  filter(dist_m > 10000) %>% 
+  filter(dist_m > shoot_distance) %>% 
   mutate(
     shoot_time_diff = as.numeric(difftime(t1_, shoot_time, units = "hours"))
   )
@@ -1037,8 +1086,6 @@ hits_nearest_time_far <- hits_nearest_time_far %>% filter(shoot_id %in% obs_shoo
 ### Extract pig GPS locations either side of the focal shoot location
 
 ```{r}
-
-shoot_focal_window <- 12 # time either side of focal shooting location (in hours)
 
 # one row per pig/shooting instance, with the temporal window to filter the data by
 focal_far <- hits_nearest_time_far %>%
@@ -1069,9 +1116,10 @@ shooting_sequences_far <- shooting_sequences_far %>%
     period = if_else(time_diff_hrs < 0, "baseline", "response"),
     seq_id = paste(name, shoot_id, sep = "_")
   ) %>%
-  arrange(seq_id, t1_)
+  arrange(seq_id, t1_) %>%
+  add_dist_to_t0()
 
-head(shooting_sequences_far, 100)
+head(shooting_sequences_far, 10)
 
 ```
 
@@ -1089,7 +1137,7 @@ shooting_sequences_daily_far <- shooting_sequences_far %>%
   slice_min(shoot_time, n = 1)  %>% 
   ungroup()
 
-head(shooting_sequences_daily_far, 100)
+head(shooting_sequences_daily_far, 10)
 
 ```
 
@@ -1102,6 +1150,15 @@ shooting_sequences_daily_far %>%
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
   geom_path(alpha = 0.5) +
   scale_y_continuous("Distance to the shooting location (m)") +
+  labs(title = "More than 10 km away from shooting locations") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+shooting_sequences_daily_far %>%
+  ggplot(aes(x = time_diff_hrs, y = dist_to_t0_m, colour = seq_id)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  geom_path(alpha = 0.5) +
+  scale_y_continuous("Distance from location at time of shooting (m)") +
   labs(title = "More than 10 km away from shooting locations") +
   theme_bw() +
   theme(legend.position = "none")
@@ -1164,6 +1221,81 @@ shooting_sequences_daily_all <- shooting_sequences_daily %>%
   bind_rows(shooting_sequences_daily_pseudo %>% mutate(type = "Pseudo")) %>% 
   bind_rows(shooting_sequences_daily_far %>% mutate(type = "Far"))
 
+# setting the colours for the shooting
+shoot_cols <- c("Observed" = "#D55E00",   # vermillion
+                "Far"      = "#0072B2",   # blue
+                "Pseudo"   = "#009E73")   # bluish green
+
+shoot_labels <- c("Observed" = "Observed shoots",
+                  "Far"      = "Far from shoots",
+                  "Pseudo"   = "5 days before")
+
+```
+
+## Distance from the location at the time of shooting
+
+Median (line) and interquartile range (ribbon) of the distance from each pig's location at the time of shooting. A curve that stays flat near 0 after the shoot indicates bunkering down, and a steeper rise for the observed shoots than for the controls indicates fleeing.
+
+```{r}
+#| results: asis
+
+bin_width <- 0.5  # hours
+
+# date windows of each shooting operation (same as the step length plots below)
+shoot_operations <- tribble(
+  ~op,                                      ~file_suffix, ~window_min,           ~window_max,
+  "All shooting operations",                "all",        as_date("2025 01 01"), as_date("2027 01 01"),
+  "First shoot (early Nov 2025)",           "first",      as_date("2025 11 01"), as_date("2025 11 10"),
+  "Second shoot (late Nov/early Dec 2025)", "second",     as_date("2025 11 20"), as_date("2025 12 14"),
+  "Third shoot (May 2026)",                 "third",      as_date("2026 05 12"), as_date("2026 05 30"),
+  "Fourth shoot (Aug 2026)",                "fourth",     as_date("2026 08 12"), as_date("2026 08 30")
+)
+
+cat("::: {.panel-tabset}\n\n")
+
+for (i in seq_len(nrow(shoot_operations))) {
+
+  op_i <- shoot_operations[i, ]
+
+  dist_t0_bins <- shooting_sequences_daily_all %>%
+    st_drop_geometry() %>%
+    filter(shoot_time > op_i$window_min & shoot_time < op_i$window_max) %>%
+    mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
+    group_by(type, bin) %>%
+    summarise(
+      q25 = quantile(dist_to_t0_m, probs = 0.25, na.rm = TRUE),
+      q50 = quantile(dist_to_t0_m, probs = 0.5, na.rm = TRUE),
+      q75 = quantile(dist_to_t0_m, probs = 0.75, na.rm = TRUE),
+      n   = sum(!is.na(dist_to_t0_m)),
+      .groups = "drop"
+    )
+
+  p <- dist_t0_bins %>%
+    ggplot(aes(x = bin)) +
+    geom_ribbon(aes(ymin = q25, ymax = q75, fill = type),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = q50, colour = type)) +
+    geom_point(aes(y = q50, colour = type), size = 1) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+    scale_y_continuous("Distance from location at time of shooting (m)") +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    labs(title = op_i$op) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(paste0(outputs_dir, "dist_to_t0_shooting_vs_pseudo_", op_i$file_suffix, ".png"),
+         plot = p, width = 150, height = 100, units = "mm", scale = 1, dpi = 600)
+
+  # one tab per shooting operation: heading first, then the plot
+  cat("\n\n### ", op_i$op, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
 ```
 
 ## Step lengths for baseline/response - filtering by shooting operation
@@ -1188,15 +1320,6 @@ bin_means_both <- shooting_sequences_daily_all %>%
     n       = sum(!is.na(sl_)),
     .groups = "drop"
   )
-
-# setting the colours for the shooting
-shoot_cols <- c("Observed" = "#D55E00",   # vermillion
-                "Far"      = "#0072B2",   # blue
-                "Pseudo"   = "#009E73")   # bluish green
-
-shoot_labels <- c("Observed" = "Observed shoots",
-                  "Far"      = "Far from shoots",
-                  "Pseudo"   = "5 days before")
 
 shooting_sequences_daily_all %>%
   ggplot(aes(x = time_diff_hrs, y = sl_, colour = type, group = interaction(type, seq_id))) +
@@ -1223,7 +1346,7 @@ shooting_sequences_daily_all %>%
   labs(title = "All shooting operations",
        colour = "Shoot", fill = "Shoot") +
   theme_bw() +
-  theme(legend.position = "right")
+  theme(legend.position = "bottom")
 
 ggsave(paste0(outputs_dir, "step_length_shooting_vs_pseudo_all.png"),
        width = 150, height = 100, units = "mm", scale = 1, dpi = 600)
@@ -1292,7 +1415,7 @@ ggsave(paste0(outputs_dir, "step_length_shooting_vs_pseudo_first.png"),
 ```{r}
 
 # second shooting operation
-shooting_window_min <- lubridate::as_date("2025 11 25")
+shooting_window_min <- lubridate::as_date("2025 11 20")
 shooting_window_max <- lubridate::as_date("2025 12 14")
 
 bin_width <- 0.5  # hours
@@ -1491,16 +1614,6 @@ veg_colours <- c(
 #| fig-height: 8
 
 bin_width <- 0.5  # hours
-
-# date windows of each shooting operation (same as the step length plots above)
-shoot_operations <- tribble(
-  ~op,                                      ~file_suffix, ~window_min,           ~window_max,
-  "All shooting operations",                "all",        as_date("2025 01 01"), as_date("2027 01 01"),
-  "First shoot (early Nov 2025)",           "first",      as_date("2025 11 01"), as_date("2025 11 10"),
-  "Second shoot (late Nov/early Dec 2025)", "second",     as_date("2025 11 25"), as_date("2025 12 14"),
-  "Third shoot (May 2026)",                 "third",      as_date("2026 05 12"), as_date("2026 05 30"),
-  "Fourth shoot (Aug 2026)",                "fourth",     as_date("2026 08 12"), as_date("2026 08 30")
-)
 
 cat("::: {.panel-tabset}\n\n")
 
@@ -1928,6 +2041,181 @@ cat("\n\n:::\n")
 ```
 
 :::
+
+# Paired comparisons: observed shoots vs 5 days before
+
+The 5-days-before control uses the same pig at the same time of day (and likely in a similar area), so each observed sequence can be paired with its own control sequence (matched by `seq_id`, i.e. pig × shoot). For each pair we:
+
+1. summarise each metric within fixed time windows relative to the shoot (one value per sequence per window),
+2. subtract the 5-days-before value from the observed value (observed − control), and
+3. test whether those paired differences are centred on 0 using a Wilcoxon signed-rank test.
+
+Pairing cancels out the diel cycle and differences between individual pigs, and summarising to one value per pair and window avoids treating the autocorrelated 30-minute fixes as independent. The histograms show exactly what each test is assessing: the distribution of paired differences, with the dashed line at 0 (no difference) and the solid line at the median difference. A shift of the histogram away from 0 is what the test detects.
+
+A few caveats: there are only a small number of pairs, and some pigs contribute more than one pair, so the pairs are not fully independent (a mixed model with a random intercept for pig would account for this). We report p-values adjusted for multiple testing (Benjamini–Hochberg, within each metric) alongside the raw values.
+
+## Set up the paired data
+
+```{r}
+
+# time windows (hours relative to the shoot) for the paired comparisons
+# windows include their start and exclude their end, so the fix at t = 0 is in the first window after the shoot
+paired_breaks <- c(-3, 0, 3, 6, 12, 24)
+paired_labels <- c("3-0 h before", "0-3 h after", "3-6 h after", "6-12 h after", "12-24 h after")
+
+paired_data <- shooting_sequences_daily_all %>%
+  st_drop_geometry() %>%
+  filter(type %in% c("Observed", "Pseudo")) %>%
+  mutate(window = cut(time_diff_hrs, breaks = paired_breaks, labels = paired_labels, right = FALSE)) %>%
+  filter(!is.na(window))
+
+# number of sequences that have both an observed and a control sequence
+paired_data %>%
+  distinct(type, seq_id) %>%
+  count(type)
+
+# Wilcoxon signed-rank test of whether the paired differences are centred on 0,
+# with Benjamini-Hochberg adjusted p-values across all the tests in the table
+paired_wilcox <- function(diffs, ...) {
+  diffs %>%
+    group_by(...) %>%
+    summarise(
+      n           = sum(!is.na(diff)),
+      median_diff = median(diff, na.rm = TRUE),
+      mean_diff   = mean(diff, na.rm = TRUE),
+      # returns NA when all differences are 0 (e.g. a vegetation class that was never used)
+      p_value     = if (all(diff == 0, na.rm = TRUE)) NA_real_ else
+                      suppressWarnings(wilcox.test(diff, mu = 0, exact = FALSE)$p.value),
+      .groups = "drop"
+    ) %>%
+    mutate(p_adj = p.adjust(p_value, method = "BH"))
+}
+
+# histogram of the paired differences, with 0 (dashed) and the median difference (solid)
+plot_paired_diffs <- function(diffs, tests, x_lab, title, digits = 2) {
+
+  tests <- tests %>%
+    mutate(label = paste0("n = ", n,
+                          "\nmean = ", round(mean_diff, digits),
+                          "\np = ", signif(p_value, 2),
+                          "\np adj = ", signif(p_adj, 2)))
+
+  diffs %>%
+    ggplot(aes(x = diff)) +
+    geom_histogram(bins = 15, fill = shoot_cols["Observed"], colour = "white", alpha = 0.7) +
+    geom_rug(colour = shoot_cols["Observed"], alpha = 0.7) +
+    geom_vline(xintercept = 0, linetype = "dashed") +
+    geom_vline(data = tests, aes(xintercept = mean_diff), colour = shoot_cols["Observed"], linewidth = 0.8) +
+    geom_text(data = tests, aes(x = Inf, y = Inf, label = label),
+              hjust = 1.05, vjust = 1.1, size = 2.5, lineheight = 0.9) +
+    scale_y_continuous("Number of pairs", expand = expansion(mult = c(0, 0.6))) +
+    labs(x = x_lab, title = title,
+         subtitle = "Observed shoot minus the same pig 5 days before") +
+    theme_bw()
+}
+
+```
+
+## Distance from the location at the time of shooting
+
+Mean distance (m) from the pig's location at t = 0 within each window. Positive differences mean the pig was further from where it was at t = 0 on the shoot day than at the same time 5 days before (i.e. fleeing), and differences near 0 mean no change relative to normal movement.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 3.5
+
+dist_t0_diffs <- paired_data %>%
+  group_by(type, seq_id, name, window) %>%
+  summarise(value = mean(dist_to_t0_m, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = type, values_from = value) %>%
+  mutate(diff = Observed - Pseudo) %>%
+  filter(!is.na(diff))
+
+dist_t0_tests <- paired_wilcox(dist_t0_diffs, window)
+dist_t0_tests
+
+plot_paired_diffs(dist_t0_diffs, dist_t0_tests,
+                  x_lab = "Difference in mean distance from location at time of shooting (m)",
+                  title = "Distance from the location at the time of shooting",
+                  digits = 0) +
+  facet_wrap(~ window, nrow = 1)
+
+ggsave(paste0(outputs_dir, "paired_diff_dist_to_t0.png"),
+       width = 250, height = 90, units = "mm", scale = 1, dpi = 600)
+
+write_csv(dist_t0_tests, paste0(outputs_dir, "paired_tests_dist_to_t0.csv"))
+
+```
+
+## Step lengths
+
+Mean log(step length + 1) within each window. Differences are on the log scale, so `exp(diff)` is the ratio of the (geometric mean) step lengths, e.g. a difference of 0.69 means steps were about twice as long on the shoot day as 5 days before.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 3.5
+
+sl_diffs <- paired_data %>%
+  group_by(type, seq_id, name, window) %>%
+  summarise(value = mean(log1p(sl_), na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = type, values_from = value) %>%
+  mutate(diff = Observed - Pseudo) %>%
+  filter(!is.na(diff))
+
+sl_tests <- paired_wilcox(sl_diffs, window) %>%
+  mutate(median_ratio = exp(median_diff))
+sl_tests
+
+plot_paired_diffs(sl_diffs, sl_tests,
+                  x_lab = "Difference in mean log(step length + 1)",
+                  title = "Step lengths") +
+  facet_wrap(~ window, nrow = 1)
+
+ggsave(paste0(outputs_dir, "paired_diff_step_length.png"),
+       width = 250, height = 90, units = "mm", scale = 1, dpi = 600)
+
+write_csv(sl_tests, paste0(outputs_dir, "paired_tests_step_length.csv"))
+
+```
+
+## Vegetation classes
+
+Proportion of fixes in each vegetation class within each window. Positive differences mean the pig used that class more on the shoot day than 5 days before. Classes that a pig never used in either sequence contribute a difference of 0, so classes that are rarely used will have most of their differences at exactly 0.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 14
+
+veg_diffs <- paired_data %>%
+  filter(!is.na(Veg_class)) %>%
+  count(type, seq_id, name, window, Veg_class) %>%
+  # fill classes that weren't used in a window with zeros, so the proportions are comparable
+  complete(nesting(seq_id, name), type, window, Veg_class, fill = list(n = 0)) %>%
+  group_by(type, seq_id, window) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup() %>%
+  filter(!is.nan(prop)) %>%  # windows with no fixes
+  select(-n) %>%
+  pivot_wider(names_from = type, values_from = prop) %>%
+  mutate(diff = Observed - Pseudo,
+         Veg_class = factor(Veg_class, levels = names(veg_colours))) %>%
+  filter(!is.na(diff))
+
+veg_tests <- paired_wilcox(veg_diffs, Veg_class, window)
+veg_tests %>% arrange(p_value)
+
+plot_paired_diffs(veg_diffs, veg_tests,
+                  x_lab = "Difference in the proportion of fixes in each vegetation class",
+                  title = "Vegetation classes") +
+  facet_grid(Veg_class ~ window, labeller = labeller(Veg_class = label_wrap_gen(12))) +
+  theme(strip.text.y = element_text(angle = 0))
+
+ggsave(paste0(outputs_dir, "paired_diff_veg_classes.png"),
+       width = 250, height = 350, units = "mm", scale = 1, dpi = 600)
+
+write_csv(veg_tests, paste0(outputs_dir, "paired_tests_veg_classes.csv"))
+
+```
 
 # References
 
