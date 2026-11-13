@@ -21,18 +21,26 @@ website:
         href: data_preparation_east_alligator.qmd
       - text: "Space Use"
         href: space_use_monthly-mcp_east_alligator.qmd
+      - text: "Revisitation"
+        href: revisitation_analysis.qmd
       - text: "Weather Responses"
         href: weather_analysis_acute_east_alligator.qmd
       - text: "Shooting Responses"
         href: shooting_analysis_east_alligator.qmd
-      - text: "deepSSF Training"
-        href: deepssf_piggies_train.ipynb
-      - text: "deepSSF Predictions"
-        href: deepssf_piggies_predict_hab-prob_start.ipynb
+      - text: "deepSSF"
+        href: deepSSF.qmd
         
     right:
       - icon: github
         href: https://github.com/swforrest/feral_pig_modelling
+        
+  sidebar:
+      - title: "deepSSF"
+        style: floating
+        contents: 
+          - deepSSF.qmd
+          - deepssf_piggies_train.ipynb
+          - deepssf_piggies_predict_hab-prob_start.ipynb
 
 format:
   html:

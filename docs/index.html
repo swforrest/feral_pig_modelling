@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>feral_pig_modelling – Kakadu Pig Modelling</title>
+<title>Kakadu Pig Modelling</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -106,6 +106,10 @@ ul.task-list li input[type="checkbox"] {
 <span class="menu-text">Space Use</span></a>
   </li>  
   <li class="nav-item">
+    <a class="nav-link" href="./revisitation_analysis.html"> 
+<span class="menu-text">Revisitation</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="./weather_analysis_acute_east_alligator.html"> 
 <span class="menu-text">Weather Responses</span></a>
   </li>  
@@ -114,12 +118,8 @@ ul.task-list li input[type="checkbox"] {
 <span class="menu-text">Shooting Responses</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./deepssf_piggies_train.html"> 
-<span class="menu-text">deepSSF Training</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./deepssf_piggies_predict_hab-prob_start.html"> 
-<span class="menu-text">deepSSF Predictions</span></a>
+    <a class="nav-link" href="./deepSSF.html"> 
+<span class="menu-text">deepSSF</span></a>
   </li>  
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
@@ -147,7 +147,8 @@ ul.task-list li input[type="checkbox"] {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">feral_pig_modelling</h1>
+<h1 class="title">Kakadu Pig Modelling</h1>
+<p class="subtitle lead">Aerial shooting and weather effects on feral pigs in the East Alligator region of Kakadu NP</p>
 </div>
 
 
@@ -164,8 +165,20 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<p>This is a Quarto website.</p>
-<p>To learn more about Quarto websites visit <a href="https://quarto.org/docs/websites" class="uri">https://quarto.org/docs/websites</a>.</p>
+<p>Here we show the results of investigating the responses of feral pigs in the East Alligator region of Kakadu National Park to aerial shooting, real-time and daily-averaged weather variables. We also show their space use, and how that changes seasonally, sub-seasonally, and monthly, and generate seasonal predictions of their distribution and connectivity, also for the wet and dry seasons.</p>
+<p>There are a number of analyses that we conducted to investigate the movement and habitat selection behaviour of the pigs, as well as their responses to weather variables and aerial shooting. The analyses include:</p>
+<p><a href="./data_preparation_east_alligator.html"><strong>Data Preparation</strong></a><br>
+Removing outliers by filtering by maximum observed speed for accurate location fixes, converting to a step format for downstream analyses, and adding covariate values to the steps, including fine-scale weather, daily averages of weather, and vegetation and terrain values at the ends of the steps.</p>
+<p><a href="./space_use_monthly-mcp_east_alligator.html"><strong>Space Use</strong></a><br>
+The home ranges of the pigs, and how their space use changed seasonally, sub-seasonally, and monthly.</p>
+<p><a href="./revisitation_analysis.html"><strong>Revisitation Analysis</strong></a><br>
+The areas were revisited most by the pigs, and what vegetation classes did that occur in.</p>
+<p><a href="./weather_analysis_acute_east_alligator.html"><strong>Weather Responses</strong></a><br>
+The movement and habitat selection responses of the pigs to fine-scale weather variables, and daily-averaged weather variables.</p>
+<p><a href="./shooting_analysis_east_alligator.html"><strong>Shooting Responses</strong></a><br>
+The responses of the pigs to aerial shooting. We assessed how their movement changed directly before and after shooting events, compared to controls of 5 days before the shooting events, and for individuals that were more than 10 km away from the shooting events.</p>
+<p><a href="./deepSSF.html"><strong>deepSSF</strong></a><br>
+Fitting deep learning step selection functions (deepSSF) for modelling and predicting the distribution and connectivity of feral pigs.</p>
 
 
 

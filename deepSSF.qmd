@@ -1,0 +1,16 @@
+---
+title: "deepSSF"
+author:
+  - name: Scott Forrest
+    email: "scottwforrest@gmail.com"
+date: today
+format: html
+---
+
+Click the tabs on the right to view the deepSSF notebooks.
+
+[**deepSSF Model Fitting**](deepssf_piggies_train.ipynb) \
+Fitting the deepSSF model to the pig data.
+
+[**deepSSF Predictions**](deepssf_piggies_predict_hab-prob_start.ipynb) \
+Generating predictions from the fitted deepSSF model. We produce maps of hourly habitat selection (without movement), seasonal and (sub-)seasonal expected distributions of pigs, and (sub-)seasonal connectivity maps.
