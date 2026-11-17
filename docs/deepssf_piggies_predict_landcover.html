@@ -1,0 +1,2091 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Scott Forrest">
+<meta name="dcterms.date" content="2026-11-17">
+
+<title>deepSSF Predictions – Kakadu Pig Modelling</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./icons/pig_image.jpeg" rel="icon" type="image/jpeg">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">Kakadu Pig Modelling</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./data_preparation_east_alligator.html"> 
+<span class="menu-text">Data Preparation</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./space_use_monthly-mcp_east_alligator.html"> 
+<span class="menu-text">Space Use</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./revisitation_analysis.html"> 
+<span class="menu-text">Revisitation</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./weather_analysis_acute_east_alligator.html"> 
+<span class="menu-text">Weather Responses</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./shooting_analysis_east_alligator.html"> 
+<span class="menu-text">Shooting Responses</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./deepSSF.html"> 
+<span class="menu-text">deepSSF</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/swforrest/feral_pig_modelling"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#setup-the-script" id="toc-setup-the-script" class="nav-link active" data-scroll-target="#setup-the-script">Setup the script</a>
+  <ul class="collapse">
+  <li><a href="#set-random-seed-and-the-device-for-predicting-from-the-model" id="toc-set-random-seed-and-the-device-for-predicting-from-the-model" class="nav-link" data-scroll-target="#set-random-seed-and-the-device-for-predicting-from-the-model">Set random seed and the device for predicting from the model</a></li>
+  <li><a href="#set-script-paths" id="toc-set-script-paths" class="nav-link" data-scroll-target="#set-script-paths">Set script paths</a></li>
+  </ul></li>
+  <li><a href="#import-data" id="toc-import-data" class="nav-link" data-scroll-target="#import-data">Import data</a>
+  <ul class="collapse">
+  <li><a href="#load_environmental_layers" id="toc-load_environmental_layers" class="nav-link" data-scroll-target="#load_environmental_layers"><code>load_environmental_layers()</code></a></li>
+  <li><a href="#scalar_cols" id="toc-scalar_cols" class="nav-link" data-scroll-target="#scalar_cols"><code>SCALAR_COLS</code></a></li>
+  <li><a href="#prepare_movement_df" id="toc-prepare_movement_df" class="nav-link" data-scroll-target="#prepare_movement_df"><code>prepare_movement_df()</code></a>
+  <ul class="collapse">
+  <li><a href="#check-and-drop-nas" id="toc-check-and-drop-nas" class="nav-link" data-scroll-target="#check-and-drop-nas">Check and drop NAs</a></li>
+  <li><a href="#encode-wind-direction-as-a-sincos-pair" id="toc-encode-wind-direction-as-a-sincos-pair" class="nav-link" data-scroll-target="#encode-wind-direction-as-a-sincos-pair">Encode wind direction as a sin/cos pair</a></li>
+  <li><a href="#scale-the-weather-covariates-with-the-training-coefficients" id="toc-scale-the-weather-covariates-with-the-training-coefficients" class="nav-link" data-scroll-target="#scale-the-weather-covariates-with-the-training-coefficients">Scale the weather covariates with the training coefficients</a></li>
+  </ul></li>
+  <li><a href="#window_size" id="toc-window_size" class="nav-link" data-scroll-target="#window_size"><code>WINDOW_SIZE</code></a></li>
+  <li><a href="#pixel_size" id="toc-pixel_size" class="nav-link" data-scroll-target="#pixel_size"><code>PIXEL_SIZE</code></a></li>
+  <li><a href="#filter_steps_by_window" id="toc-filter_steps_by_window" class="nav-link" data-scroll-target="#filter_steps_by_window"><code>filter_steps_by_window()</code></a></li>
+  <li><a href="#params_from_checkpoint" id="toc-params_from_checkpoint" class="nav-link" data-scroll-target="#params_from_checkpoint"><code>params_from_checkpoint()</code></a></li>
+  <li><a href="#convjointmodel" id="toc-convjointmodel" class="nav-link" data-scroll-target="#convjointmodel"><code>ConvJointModel</code></a></li>
+  <li><a href="#load-the-trained-model" id="toc-load-the-trained-model" class="nav-link" data-scroll-target="#load-the-trained-model">Load the trained model</a></li>
+  <li><a href="#convert-the-numpy-rasters-loaded-earlier-into-pytorch-tensors" id="toc-convert-the-numpy-rasters-loaded-earlier-into-pytorch-tensors" class="nav-link" data-scroll-target="#convert-the-numpy-rasters-loaded-earlier-into-pytorch-tensors">Convert the NumPy rasters loaded earlier into PyTorch tensors</a></li>
+  </ul></li>
+  <li><a href="#habitat-selection-across-the-full-landscape" id="toc-habitat-selection-across-the-full-landscape" class="nav-link" data-scroll-target="#habitat-selection-across-the-full-landscape">Habitat selection across the full landscape</a>
+  <ul class="collapse">
+  <li><a href="#scalar-inputs-for-the-prediction" id="toc-scalar-inputs-for-the-prediction" class="nav-link" data-scroll-target="#scalar-inputs-for-the-prediction">Scalar inputs for the prediction</a></li>
+  <li><a href="#predict_habitat_landscape" id="toc-predict_habitat_landscape" class="nav-link" data-scroll-target="#predict_habitat_landscape"><code>predict_habitat_landscape()</code></a>
+  <ul class="collapse">
+  <li><a href="#plot-the-landscape-scale-habitat-selection-surface" id="toc-plot-the-landscape-scale-habitat-selection-surface" class="nav-link" data-scroll-target="#plot-the-landscape-scale-habitat-selection-surface">Plot the landscape-scale habitat selection surface</a></li>
+  </ul></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">deepSSF Predictions</h1><button type="button" class="btn code-tools-button dropdown-toggle" id="quarto-code-tools-menu" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi"></i> Code</button><ul class="dropdown-menu dropdown-menu-end" aria-labelelledby="quarto-code-tools-menu"><li><a id="quarto-show-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Show All Code</a></li><li><a id="quarto-hide-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Hide All Code</a></li></ul></div></div>
+</div>
+
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Author</div>
+  <div class="quarto-title-meta-heading">Affiliation</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author"><a href="https://swforrest.github.io/">Scott Forrest</a> <a href="mailto:scottwforrest@gmail.com" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> <a href="https://orcid.org/0000-0001-9529-0108" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Queensland University of Technology, CSIRO
+          </p>
+      </div>
+  </div>
+
+<div class="quarto-title-meta">
+
+      
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">November 17, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+<div>
+  <div class="abstract">
+    <div class="block-title">Abstract</div>
+    <p>Generating predictions from a trained deepSSF model of feral pig movement, with landcover and weather covariates.</p>
+  </div>
+</div>
+
+
+</header>
+
+
+<div id="cell-1" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:37.751123Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:37.750945Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.557953Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.557509Z&quot;}}" data-execution_count="1">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rasterio</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rasterio.plot  <span class="co"># submodule is not imported by `import rasterio` alone</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> networkx <span class="im">as</span> nx</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> base64</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> IPython.display <span class="im">import</span> Image  <span class="co"># For displaying the training GIF - doesn't work in Quarto, but does in Jupyter</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> IPython.display <span class="im">import</span> HTML</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> IPython.display <span class="im">import</span> IFrame</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rasterio.transform <span class="im">import</span> Affine</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> matplotlib.colors <span class="im">import</span> LogNorm</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Use this to load the functions used in this notebook</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="co"># You can also 'import deepssf' and call functions as deepssf.function_name</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> deepssf</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"deepssf </span><span class="sc">{</span>deepssf<span class="sc">.</span>__version__<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"torch </span><span class="sc">{</span>torch<span class="sc">.</span>__version__<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>deepssf 0.3.2
+torch 2.12.0</code></pre>
+</div>
+</div>
+<section id="setup-the-script" class="level1">
+<h1>Setup the script</h1>
+<section id="set-random-seed-and-the-device-for-predicting-from-the-model" class="level2">
+<h2 class="anchored" data-anchor-id="set-random-seed-and-the-device-for-predicting-from-the-model">Set random seed and the device for predicting from the model</h2>
+<p>If you have a GPU, this is where it will be specified (automatically).</p>
+<div id="cell-3" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:38.571198Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:38.571076Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.584210Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.583922Z&quot;}}" data-execution_count="2">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Reproducibility — fix random seeds so results are the same on every run.</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Prediction is not deterministic: simulate_trajectory() samples a next location</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># from the predicted probability surface at every step, so without a seed two</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># runs of the same trained model give different trajectories (and a different</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co"># heatmap).  Seeding here makes a set of simulations reproducible.</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>torch.manual_seed(<span class="dv">42</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>np.random.seed(<span class="dv">42</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co"># DEVICE is capitalised — module-level constant (set once, never reassigned).</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co"># get_device() returns 'cuda' if a GPU is available, 'mps' on Apple Silicon,</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co"># or 'cpu' otherwise.  All tensors and the model are moved to this device.</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>DEVICE <span class="op">=</span> deepssf.get_device()</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Device: </span><span class="sc">{</span>DEVICE<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Device: mps</code></pre>
+</div>
+</div>
+</section>
+<section id="set-script-paths" class="level2">
+<h2 class="anchored" data-anchor-id="set-script-paths">Set script paths</h2>
+<p>These must point at the same data and rasters the model was trained on — the model takes one input channel per raster band, in <code>LAYER_PATHS</code> order, so a different set of layers (or a different order) either fails to load the weights or feeds the wrong covariate into each filter.</p>
+<p><code>OUTPUT_DIR</code> is the directory a training run wrote its checkpoints to, given here as a literal path rather than through <code>get_output_dir()</code> (which mints a <em>new</em> dated directory). Figures and rasters produced below are written back into the same directory, alongside the model they came from.</p>
+<p><em>All-caps names below are module-level constants — set once here and referenced throughout the notebook without being reassigned. Python has no built-in constant keyword, so capitalisation is the community convention (PEP 8) to signal “do not change this value”.</em></p>
+<div id="cell-5" class="cell" data-execution_count="3">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>DATA_DIR <span class="op">=</span> Path(<span class="st">"data"</span>)  <span class="co"># location of the bundled sample data</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>MAPPING_DIR <span class="op">=</span> Path(<span class="st">"mapping"</span>)  <span class="co"># location of the landcover mapping files</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>CSV_PATH <span class="op">=</span> DATA_DIR <span class="op">/</span> <span class="st">"pigs_east_alligator_steps_covs_20261015.csv"</span>  <span class="co"># GPS tracking data, 28 individuals</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Must match LAYER_PATHS in deepssf_piggies_train_landcover.ipynb, in the same order.</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co"># </span><span class="al">NOTE</span><span class="co">: 's2' and 's2_dir' are RESERVED keys in load_environmental_layers().</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 's2_dir' triggers the monthly-composite loader (load_s2_data), and a plain</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 's2' entry is skipped by the per-file loop — so a single multi-band GeoTIFF</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co"># must be given any *other* name, otherwise nothing is loaded and the function</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co"># raises "raster_transform could not be set".</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>LAYER_PATHS <span class="op">=</span> {</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Topographic layers (DEM, slope)</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">"dem"</span>: <span class="bu">str</span>(MAPPING_DIR <span class="op">/</span> <span class="st">"DEM_east_alligator_3112.tif"</span>),</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    <span class="st">"slope"</span>: <span class="bu">str</span>(MAPPING_DIR <span class="op">/</span> <span class="st">"slope_east_alligator_3112.tif"</span>),</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Categorical landcover layers (one-hot encoded)</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    <span class="st">"landcover"</span>: <span class="bu">str</span>(MAPPING_DIR <span class="op">/</span> <span class="st">"landcover_dummy_east_alligator.tif"</span>),</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="co"># The training run to predict from — where its checkpoints and scaling</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="co"># coefficients were written by deepssf_piggies_train_landcover.ipynb, and where</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="co"># the outputs below are saved.</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>OUTPUT_DIR <span class="op">=</span> Path(<span class="st">"outputs/landcover/2026-11-17_1"</span>)</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>CKPT_PATH <span class="op">=</span> OUTPUT_DIR <span class="op">/</span> <span class="st">"best_model.pt"</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>SCALING_PATH <span class="op">=</span> OUTPUT_DIR <span class="op">/</span> <span class="st">"scalar_scaling.csv"</span>  <span class="co"># weather-covariate scaling used in training</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> path <span class="kw">in</span> (CKPT_PATH, SCALING_PATH):</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> path.exists():</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>        <span class="cf">raise</span> <span class="pp">FileNotFoundError</span>(</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"No </span><span class="sc">{</span>path<span class="sc">.</span>name<span class="sc">}</span><span class="ss"> in </span><span class="sc">{</span>OUTPUT_DIR<span class="sc">}</span><span class="ss"> — set OUTPUT_DIR to a directory that "</span></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>            <span class="st">"deepssf_piggies_train_landcover.ipynb has finished writing to."</span></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Output directory: </span><span class="sc">{</span>OUTPUT_DIR<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Checkpoints:"</span>, <span class="st">", "</span>.join(<span class="bu">sorted</span>(p.name <span class="cf">for</span> p <span class="kw">in</span> OUTPUT_DIR.glob(<span class="st">"*.pt"</span>))))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Output directory: outputs/landcover/2026-11-17_1
+Checkpoints: best_model.pt, best_model_habitat.pt, best_model_movement.pt</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="import-data" class="level1">
+<h1>Import data</h1>
+<p>The csv file is imported with a timestamp and an x and y coordinate. In our case the data was already in a projected format that is specific to Australia (EPSG:3112), which is the same crs as the raster data which will be imported.</p>
+<div id="cell-7" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-05-25T00:07:38.588201Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-05-25T00:07:38.588148Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-05-25T00:07:38.597239Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-05-25T00:07:38.596886Z&quot;}}" data-execution_count="4">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>raw_df <span class="op">=</span> pd.read_csv(CSV_PATH)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Raw GPS fixes : </span><span class="sc">{</span><span class="bu">len</span>(raw_df)<span class="sc">:,}</span><span class="ss">"</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Individuals   : </span><span class="sc">{</span>raw_df[<span class="st">'name'</span>]<span class="sc">.</span>nunique()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Sort by the individual ID and timestamp to ensure correct temporal order</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>raw_df <span class="op">=</span> raw_df.sort_values(by<span class="op">=</span>[<span class="st">"name"</span>, <span class="st">"t1_"</span>]).reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert the 'time' column to the correct timezone (here Australia/Darwin), then</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co"># drop the offset.  prepare_movement_df() re-parses timestamps with utc=True, so a</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># tz-aware Darwin column would be converted straight back to UTC and hour_t1 would</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="co"># be 9.5 h out — making the diel covariates wrong.  Localising to Darwin and then</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="co"># going tz-naive keeps the local clock time that the sin/cos encodings need.</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>raw_df[<span class="st">"t1_"</span>] <span class="op">=</span> (</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>        pd.to_datetime(raw_df[<span class="st">"t1_"</span>], utc<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>        .dt.tz_convert(<span class="st">"Australia/Darwin"</span>)</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>        .dt.tz_localize(<span class="va">None</span>)</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>raw_df.head()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stderr">
+<pre><code>/var/folders/w0/qvtthgds7m133drnqxl72fwr0000gn/T/ipykernel_16915/152548867.py:1: DtypeWarning: Columns (0: jabru_cloud_amount_2, 1: jabru_cloud_amount_3) have mixed types. Specify dtype option on import or set low_memory=False.
+  raw_df = pd.read_csv(CSV_PATH)</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Raw GPS fixes : 254,397
+Individuals   : 19</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">name</th>
+<th data-quarto-table-cell-role="th">n_sat</th>
+<th data-quarto-table-cell-role="th">id</th>
+<th data-quarto-table-cell-role="th">x1_</th>
+<th data-quarto-table-cell-role="th">x2_</th>
+<th data-quarto-table-cell-role="th">y1_</th>
+<th data-quarto-table-cell-role="th">y2_</th>
+<th data-quarto-table-cell-role="th">sl_</th>
+<th data-quarto-table-cell-role="th">direction_p</th>
+<th data-quarto-table-cell-role="th">ta_</th>
+<th data-quarto-table-cell-role="th">...</th>
+<th data-quarto-table-cell-role="th">veg_mudflat</th>
+<th data-quarto-table-cell-role="th">veg_dry_rainforest</th>
+<th data-quarto-table-cell-role="th">veg_eucalypt_open_forest</th>
+<th data-quarto-table-cell-role="th">veg_eucalypt_woodland</th>
+<th data-quarto-table-cell-role="th">veg_floodplain_sedgeland</th>
+<th data-quarto-table-cell-role="th">veg_mangrove</th>
+<th data-quarto-table-cell-role="th">veg_melaleuca_closed_forest</th>
+<th data-quarto-table-cell-role="th">veg_melaleuca_open_forest</th>
+<th data-quarto-table-cell-role="th">veg_melaleuca_woodland</th>
+<th data-quarto-table-cell-role="th">veg_water</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>Betty</td>
+<td>8</td>
+<td>152638</td>
+<td>-147079.566606</td>
+<td>-146943.383423</td>
+<td>-1.423197e+06</td>
+<td>-1.423458e+06</td>
+<td>294.751498</td>
+<td>-1.090517</td>
+<td>-0.328911</td>
+<td>...</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>Betty</td>
+<td>5</td>
+<td>152638</td>
+<td>-146943.383423</td>
+<td>-146926.463908</td>
+<td>-1.423458e+06</td>
+<td>-1.423483e+06</td>
+<td>29.750385</td>
+<td>-0.965853</td>
+<td>0.124664</td>
+<td>...</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>Betty</td>
+<td>5</td>
+<td>152638</td>
+<td>-146926.463908</td>
+<td>-146925.833493</td>
+<td>-1.423483e+06</td>
+<td>-1.423447e+06</td>
+<td>36.144168</td>
+<td>1.553354</td>
+<td>2.519206</td>
+<td>...</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>Betty</td>
+<td>7</td>
+<td>152638</td>
+<td>-146925.833493</td>
+<td>-146904.536146</td>
+<td>-1.423447e+06</td>
+<td>-1.423442e+06</td>
+<td>21.866208</td>
+<td>0.228601</td>
+<td>-1.324753</td>
+<td>...</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>Betty</td>
+<td>7</td>
+<td>152638</td>
+<td>-146904.536146</td>
+<td>-146941.346298</td>
+<td>-1.423442e+06</td>
+<td>-1.423462e+06</td>
+<td>41.990170</td>
+<td>-2.639625</td>
+<td>-2.868225</td>
+<td>...</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+
+<p>5 rows × 77 columns</p>
+</div>
+</div>
+</div>
+<section id="load_environmental_layers" class="level2">
+<h2 class="anchored" data-anchor-id="load_environmental_layers"><code>load_environmental_layers()</code></h2>
+<p>Reads each GeoTIFF listed in LAYER_PATHS, min–max</p>
+<ul>
+<li>Scales every band to [0, 1], and returns:
+<ul>
+<li><code>env_layers</code> — dict mapping layer name → NumPy array: 2-D (H × W) for single-band GeoTIFFs, 3-D (bands × H × W) for multi-band ones, where each band becomes its own model input channel</li>
+<li><code>raster_transform</code> — Affine object that converts pixel (row, col) indices to the projected coordinates (easting, northing) of the raster(s), which should be in the same CRS as the GPS data. This transform is used whenever we need to translate between pixel space and real-world coordinates.</li>
+</ul></li>
+</ul>
+<p><strong>Two things to watch for:</strong></p>
+<ol type="1">
+<li>The keys <code>'s2'</code> and <code>'s2_dir'</code> are <em>reserved</em> for the monthly Sentinel-2 composite loader — a single GeoTIFF passed under the name <code>'s2'</code> is silently skipped (see the note in the paths cell above).</li>
+<li>The rescaling uses a <strong>single global min/max across all bands</strong> of a file, and computes <code>(data - lo) / hi</code> rather than <code>(data - lo) / (hi - lo)</code>. Our index raster is <code>int16</code> scaled by 10 000 with ±10 000 fill values, so the loaded values span [0, 2] rather than [0, 1] and the three indices are not individually normalised. That is workable (the CNN can rescale internally) but if it hurts training, pre-scale each band yourself and save as <code>.npy</code> — non-<code>.tif</code> paths in <code>LAYER_PATHS</code> are loaded with <code>np.load(..., mmap_mode='r')</code> and left untouched, though at least one real <code>.tif</code> must remain in the dict so the transform can be set.</li>
+</ol>
+<div id="cell-9" class="cell" data-execution_count="5">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>env_layers, raster_transform <span class="op">=</span> deepssf.load_environmental_layers(LAYER_PATHS)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Layers loaded:"</span>, <span class="bu">list</span>(env_layers.keys()))</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, arr <span class="kw">in</span> env_layers.items():</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>name<span class="sc">}</span><span class="ss">: shape=</span><span class="sc">{</span>arr<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">, min=</span><span class="sc">{</span>arr<span class="sc">.</span><span class="bu">min</span>()<span class="sc">:.3f}</span><span class="ss">, max=</span><span class="sc">{</span>arr<span class="sc">.</span><span class="bu">max</span>()<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Each band of a multi-band layer becomes one CNN input channel, so count bands</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="co"># (not layers) here and reuse the total when setting ModelParams below.  Deriving</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="co"># it means switching rasters in LAYER_PATHS needs no other edits.</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>N_SPATIAL_CHANNELS <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">if</span> arr.ndim <span class="op">==</span> <span class="dv">2</span> <span class="cf">else</span> arr.shape[<span class="dv">0</span>] <span class="cf">for</span> arr <span class="kw">in</span> env_layers.values())</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Spatial channels: </span><span class="sc">{</span>N_SPATIAL_CHANNELS<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Layer 'dem': min=-2.8075695037841797, max=70.5344009399414 → scaled to [0, 1]
+Layer 'slope': min=0.0, max=10.422045707702637 → scaled to [0, 1]
+Layer 'landcover': min=0.0, max=1.0 → scaled to [0, 1]
+Layers loaded: ['dem', 'slope', 'landcover']
+  dem: shape=(1335, 1715), min=0.000, max=1.000
+  slope: shape=(1335, 1715), min=0.000, max=1.000
+  landcover: shape=(10, 1335, 1715), min=0.000, max=1.000
+Spatial channels: 12</code></pre>
+</div>
+</div>
+</section>
+<section id="scalar_cols" class="level2">
+<h2 class="anchored" data-anchor-id="scalar_cols"><code>SCALAR_COLS</code></h2>
+<p>These are non-spatial inputs. For processing with convolutional layers, they are converted into spatial windows (rasters/arrays), and stacked with the truly spatial covariates.</p>
+<p>The model receives a fixed-size spatial window centred on each step’s start location. To let the network express time-varying habitat preferences (e.g.&nbsp;different nocturnal vs diurnal use), scalar covariates are tiled into additional channels of the same H × W size, so every pixel “knows” the current time context when habitat suitability is estimated.</p>
+<ul>
+<li><code>hour_t1_sin1</code> / <code>hour_t1_cos1</code>
+<ul>
+<li>Sine and cosine of (2π × hour / 24), encoding time-of-day as a <em>circular</em> variable. The circular encoding means 23:00 and 01:00 are treated as adjacent — a plain hour value would have an artificial discontinuity at midnight.</li>
+</ul></li>
+<li><code>yday_t1_sin1</code> / <code>yday_t1_cos1</code>
+<ul>
+<li>Same circular encoding for day-of-year (1–365), capturing seasonal variation in habitat use (e.g.&nbsp;dry-season vs wet-season movements).</li>
+</ul></li>
+<li><code>dt_hour</code>
+<ul>
+<li>Elapsed time between consecutive fixes (hours). Because GPS collars do not always fix at a perfectly regular rate, including dt_hour lets the movement kernel rescale expected displacement proportionally to the actual time interval rather than assuming a fixed fix rate. Note: dt_hour must be supplied at <em>simulation</em> time as well, so that <code>simulate_trajectory()</code> produces inputs consistent with training.</li>
+</ul></li>
+<li>Weather covariates from the <code>onpli_</code> weather station, carried over from the CSV for the start of each step:
+<ul>
+<li><code>rain_30min_mm</code>, <code>air_temp_c</code>, <code>wet_bulb_temp_c</code>, <code>dew_point_temp_c</code>, <code>rel_humidity_pct</code>, <code>wind_speed_kmh</code>
+<ul>
+<li>Standardised to z-scores (the <code>*_scaled</code> columns) before going into the model, with rain log-transformed, log(1 + x), first. The mean and SD are kept so model inputs and effects can be converted back to natural units.</li>
+</ul></li>
+<li><code>wind_dir_deg</code>
+<ul>
+<li>Encoded as a sine/cosine pair (<code>onpli_wind_dir_sin1</code> / <code>onpli_wind_dir_cos1</code>) for the same wraparound reason as hour of day, with calm steps set to (0, 0).</li>
+</ul></li>
+</ul></li>
+</ul>
+<p>These must match <code>SCALAR_COLS</code> in the training notebook — same columns, same order.</p>
+<div id="cell-11" class="cell" data-execution_count="6">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Time covariates derived by prepare_movement_df().  Not scaled: the sin/cos pairs</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co"># are already in [-1, 1], and simulate_trajectory() fills dt_hour with the raw</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="co"># time_between_steps (hours), so the model has to be trained on raw hours too.</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>TIME_COLS <span class="op">=</span> [<span class="st">"hour_t1_sin1"</span>,</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>             <span class="st">"hour_t1_cos1"</span>,</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>             <span class="st">"yday_t1_sin1"</span>,</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>             <span class="st">"yday_t1_cos1"</span>,</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>             <span class="st">"dt_hour"</span>]</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Weather covariates carried over from the CSV in natural units, and standardised</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="co"># to z-scores further down (the "_scaled" columns)</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>WEATHER_COLS <span class="op">=</span> [<span class="st">"onpli_rain_30min_mm"</span>,</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>                <span class="st">"onpli_air_temp_c"</span>,</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>                <span class="st">"onpli_wet_bulb_temp_c"</span>,</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>                <span class="st">"onpli_dew_point_temp_c"</span>,</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>                <span class="st">"onpli_rel_humidity_pct"</span>,</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>                <span class="st">"onpli_wind_speed_kmh"</span></span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>                ]</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Wind direction (degrees) is carried over, then encoded as a sin/cos pair further</span></span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a><span class="co"># down rather than scaled</span></span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>WIND_DIR_COL <span class="op">=</span> <span class="st">"onpli_wind_dir_deg"</span></span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a><span class="co"># The model inputs, in the order the model sees them</span></span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>SCALAR_COLS <span class="op">=</span> (</span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>    TIME_COLS</span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> [<span class="ss">f"</span><span class="sc">{</span>col<span class="sc">}</span><span class="ss">_scaled"</span> <span class="cf">for</span> col <span class="kw">in</span> WEATHER_COLS]</span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> [<span class="st">"onpli_wind_dir_sin1"</span>, <span class="st">"onpli_wind_dir_cos1"</span>]</span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="bu">len</span>(SCALAR_COLS)<span class="sc">}</span><span class="ss"> scalar inputs: </span><span class="sc">{</span>SCALAR_COLS<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>13 scalar inputs: ['hour_t1_sin1', 'hour_t1_cos1', 'yday_t1_sin1', 'yday_t1_cos1', 'dt_hour', 'onpli_rain_30min_mm_scaled', 'onpli_air_temp_c_scaled', 'onpli_wet_bulb_temp_c_scaled', 'onpli_dew_point_temp_c_scaled', 'onpli_rel_humidity_pct_scaled', 'onpli_wind_speed_kmh_scaled', 'onpli_wind_dir_sin1', 'onpli_wind_dir_cos1']</code></pre>
+</div>
+</div>
+</section>
+<section id="prepare_movement_df" class="level2">
+<h2 class="anchored" data-anchor-id="prepare_movement_df"><code>prepare_movement_df()</code></h2>
+<p>Converts a fixes dataframe (one row per GPS location) into a <em>step</em> dataframe (one row per movement between consecutive fixes).</p>
+<ul>
+<li>For each step it computes:
+<ul>
+<li><code>dx</code>, <code>dy</code> — displacement in projected CRS units (metres)</li>
+<li><code>bearing</code> — direction of travel (radians; 0 = north, clockwise positive)</li>
+<li><code>bearing_tm1</code> — bearing of the <em>previous</em> step, used as a model input so the network can capture directional persistence by estimating a turning angle</li>
+<li><code>dt_hour</code> — time elapsed between consecutive fixes (hours)</li>
+<li><code>hour_t1</code>, <code>yday_t1</code> — decimal hour-of-day and day-of-year at the step start location</li>
+<li><code>*_sin1</code> / <code>*_cos1</code> — sine/cosine encodings of hour and yday (see SCALAR_COLS below)</li>
+</ul></li>
+</ul>
+<p>The “1” on column names (x1_, y1_, t1_, etc.) flags them as “start of step” variables; and the “2” in x2_, y2_, t2_ are the corresponding “end of step” values, following the convention of the <code>amt</code> package <span class="citation" data-cites="Signer2019-fi">(<a href="#ref-Signer2019-fi" role="doc-biblioref">Signer et al. 2019</a>)</span>. The last fix for each individual is dropped because no forward step can be formed.</p>
+<div id="cell-13" class="cell" data-execution_count="7">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The CSV is already in amt step format, but prepare_movement_df() expects one row</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="co"># per *fix* and rebuilds the steps itself (it also derives bearing, dt_hour and the</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="co"># cyclic time encodings the model needs).  Point it at the step-start columns and</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="co"># let it re-form the steps from consecutive fixes.</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>step_df <span class="op">=</span> deepssf.prepare_movement_df(</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    raw_df, </span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    id_col<span class="op">=</span><span class="st">"name"</span>, </span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>    time_col<span class="op">=</span><span class="st">"t1_"</span>, </span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>    x_col<span class="op">=</span><span class="st">"x1_"</span>, </span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>    y_col<span class="op">=</span><span class="st">"y1_"</span>,</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    <span class="co"># derives the time cols; carries the weather and wind direction cols over</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>    scalar_cols<span class="op">=</span>TIME_COLS <span class="op">+</span> WEATHER_COLS <span class="op">+</span> [WIND_DIR_COL],</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>n_dropped <span class="op">=</span> <span class="bu">len</span>(raw_df) <span class="op">-</span> <span class="bu">len</span>(step_df)</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Movement steps : </span><span class="sc">{</span><span class="bu">len</span>(step_df)<span class="sc">:,}</span><span class="ss">  (</span><span class="sc">{</span>n_dropped<span class="sc">}</span><span class="ss"> dropped — last per individual)"</span>)</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>step_df.head()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Movement steps : 254,378  (19 dropped — last per individual)</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">id</th>
+<th data-quarto-table-cell-role="th">t1_</th>
+<th data-quarto-table-cell-role="th">x1_</th>
+<th data-quarto-table-cell-role="th">y1_</th>
+<th data-quarto-table-cell-role="th">t2_</th>
+<th data-quarto-table-cell-role="th">x2_</th>
+<th data-quarto-table-cell-role="th">y2_</th>
+<th data-quarto-table-cell-role="th">dx</th>
+<th data-quarto-table-cell-role="th">dy</th>
+<th data-quarto-table-cell-role="th">sl_</th>
+<th data-quarto-table-cell-role="th">...</th>
+<th data-quarto-table-cell-role="th">hour_t1_cos1</th>
+<th data-quarto-table-cell-role="th">yday_t1_sin1</th>
+<th data-quarto-table-cell-role="th">yday_t1_cos1</th>
+<th data-quarto-table-cell-role="th">onpli_rain_30min_mm</th>
+<th data-quarto-table-cell-role="th">onpli_air_temp_c</th>
+<th data-quarto-table-cell-role="th">onpli_wet_bulb_temp_c</th>
+<th data-quarto-table-cell-role="th">onpli_dew_point_temp_c</th>
+<th data-quarto-table-cell-role="th">onpli_rel_humidity_pct</th>
+<th data-quarto-table-cell-role="th">onpli_wind_speed_kmh</th>
+<th data-quarto-table-cell-role="th">onpli_wind_dir_deg</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>Betty</td>
+<td>2025-10-10 09:00:15+00:00</td>
+<td>-147079.566606</td>
+<td>-1.423197e+06</td>
+<td>2025-10-10 09:30:25+00:00</td>
+<td>-146943.383423</td>
+<td>-1.423458e+06</td>
+<td>136.183183</td>
+<td>-261.405024</td>
+<td>294.751498</td>
+<td>...</td>
+<td>-0.707107</td>
+<td>-0.987873</td>
+<td>0.155266</td>
+<td>0.0</td>
+<td>28.8</td>
+<td>25.9</td>
+<td>24.6</td>
+<td>78.0</td>
+<td>3.6</td>
+<td>90.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>Betty</td>
+<td>2025-10-10 09:30:25+00:00</td>
+<td>-146943.383423</td>
+<td>-1.423458e+06</td>
+<td>2025-10-10 10:00:27+00:00</td>
+<td>-146926.463908</td>
+<td>-1.423483e+06</td>
+<td>16.919515</td>
+<td>-24.470705</td>
+<td>29.750385</td>
+<td>...</td>
+<td>-0.793353</td>
+<td>-0.987873</td>
+<td>0.155266</td>
+<td>0.0</td>
+<td>29.3</td>
+<td>25.9</td>
+<td>24.4</td>
+<td>75.0</td>
+<td>5.4</td>
+<td>70.0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>Betty</td>
+<td>2025-10-10 10:00:27+00:00</td>
+<td>-146926.463908</td>
+<td>-1.423483e+06</td>
+<td>2025-10-10 10:31:02+00:00</td>
+<td>-146925.833493</td>
+<td>-1.423447e+06</td>
+<td>0.630415</td>
+<td>36.138670</td>
+<td>36.144168</td>
+<td>...</td>
+<td>-0.866025</td>
+<td>-0.987873</td>
+<td>0.155266</td>
+<td>0.2</td>
+<td>30.6</td>
+<td>25.7</td>
+<td>23.5</td>
+<td>66.0</td>
+<td>9.4</td>
+<td>40.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>Betty</td>
+<td>2025-10-10 10:31:02+00:00</td>
+<td>-146925.833493</td>
+<td>-1.423447e+06</td>
+<td>2025-10-10 11:00:14+00:00</td>
+<td>-146904.536146</td>
+<td>-1.423442e+06</td>
+<td>21.297347</td>
+<td>4.955208</td>
+<td>21.866208</td>
+<td>...</td>
+<td>-0.925541</td>
+<td>-0.987873</td>
+<td>0.155266</td>
+<td>0.0</td>
+<td>32.1</td>
+<td>26.2</td>
+<td>23.6</td>
+<td>61.0</td>
+<td>14.8</td>
+<td>80.0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>Betty</td>
+<td>2025-10-10 11:00:14+00:00</td>
+<td>-146904.536146</td>
+<td>-1.423442e+06</td>
+<td>2025-10-10 11:30:27+00:00</td>
+<td>-146941.346298</td>
+<td>-1.423462e+06</td>
+<td>-36.810152</td>
+<td>-20.203639</td>
+<td>41.990170</td>
+<td>...</td>
+<td>-0.965926</td>
+<td>-0.987873</td>
+<td>0.155266</td>
+<td>0.0</td>
+<td>32.1</td>
+<td>26.0</td>
+<td>23.3</td>
+<td>60.0</td>
+<td>13.0</td>
+<td>80.0</td>
+</tr>
+</tbody>
+</table>
+
+<p>5 rows × 27 columns</p>
+</div>
+</div>
+</div>
+<section id="check-and-drop-nas" class="level3">
+<h3 class="anchored" data-anchor-id="check-and-drop-nas">Check and drop NAs</h3>
+<div id="cell-15" class="cell" data-execution_count="8">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Columns that must be complete for a step to be used</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>NA_CHECK_COLS <span class="op">=</span> TIME_COLS <span class="op">+</span> WEATHER_COLS <span class="op">+</span> [WIND_DIR_COL]</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Check: missing values per column ---</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>na_mask <span class="op">=</span> step_df[NA_CHECK_COLS].isna()</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Missing values per column:"</span>)</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(na_mask.<span class="bu">sum</span>().to_string())</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Drop: every step with a missing value in any of these columns ---</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>drop_rows <span class="op">=</span> na_mask.<span class="bu">any</span>(axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> drop_rows.<span class="bu">any</span>():</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Record which column(s) caused each dropped step (kept for inspection)</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>    dropped_steps <span class="op">=</span> step_df.loc[drop_rows, [<span class="st">"id"</span>, <span class="st">"t1_"</span>]].copy()</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>    dropped_steps[<span class="st">"na_cols"</span>] <span class="op">=</span> na_mask[drop_rows].<span class="bu">apply</span>(</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>        <span class="kw">lambda</span> row: <span class="st">", "</span>.join(row.index[row]), axis<span class="op">=</span><span class="dv">1</span></span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Dropping </span><span class="sc">{</span>drop_rows<span class="sc">.</span><span class="bu">sum</span>()<span class="sc">:,}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(step_df)<span class="sc">:,}</span><span class="ss"> steps "</span></span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"(</span><span class="sc">{</span>drop_rows<span class="sc">.</span>mean()<span class="sc">:.2%}</span><span class="ss">).  Column(s) with NAs that caused the drop:"</span>)</span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(dropped_steps[<span class="st">"na_cols"</span>].value_counts().to_string())</span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>    step_df <span class="op">=</span> step_df.loc[<span class="op">~</span>drop_rows].reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">No steps with missing values."</span>)</span>
+<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Steps remaining: </span><span class="sc">{</span><span class="bu">len</span>(step_df)<span class="sc">:,}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Missing values per column:
+hour_t1_sin1                 0
+hour_t1_cos1                 0
+yday_t1_sin1                 0
+yday_t1_cos1                 0
+dt_hour                      0
+onpli_rain_30min_mm       5583
+onpli_air_temp_c          1651
+onpli_wet_bulb_temp_c     1651
+onpli_dew_point_temp_c    1651
+onpli_rel_humidity_pct    1651
+onpli_wind_speed_kmh      1460
+onpli_wind_dir_deg        1479
+
+Dropping 7,104 of 254,378 steps (2.79%).  Column(s) with NAs that caused the drop:
+na_cols
+onpli_rain_30min_mm                                                                                                                                       4234
+onpli_air_temp_c, onpli_wet_bulb_temp_c, onpli_dew_point_temp_c, onpli_rel_humidity_pct                                                                    990
+onpli_rain_30min_mm, onpli_wind_speed_kmh, onpli_wind_dir_deg                                                                                              699
+onpli_wind_speed_kmh, onpli_wind_dir_deg                                                                                                                   501
+onpli_rain_30min_mm, onpli_air_temp_c, onpli_wet_bulb_temp_c, onpli_dew_point_temp_c, onpli_rel_humidity_pct                                               401
+onpli_rain_30min_mm, onpli_air_temp_c, onpli_wet_bulb_temp_c, onpli_dew_point_temp_c, onpli_rel_humidity_pct, onpli_wind_speed_kmh, onpli_wind_dir_deg     249
+onpli_wind_dir_deg                                                                                                                                          19
+onpli_air_temp_c, onpli_wet_bulb_temp_c, onpli_dew_point_temp_c, onpli_rel_humidity_pct, onpli_wind_speed_kmh, onpli_wind_dir_deg                           11
+
+Steps remaining: 247,274</code></pre>
+</div>
+</div>
+</section>
+<section id="encode-wind-direction-as-a-sincos-pair" class="level3">
+<h3 class="anchored" data-anchor-id="encode-wind-direction-as-a-sincos-pair">Encode wind direction as a sin/cos pair</h3>
+<p>Wind direction follows the BoM convention: the compass bearing the wind blows <em>from</em>, in 10° steps clockwise from north (90 = from the east). North is recorded as 360, and 0 is reserved for <strong>calm</strong> (no wind, so no direction).</p>
+<p>Taking the sine and cosine removes the wraparound, so 350° and 10° sit next to each other and 0° and 360° both mean north: - <code>onpli_wind_dir_sin1</code> — east–west component (+1 = from the east, −1 = from the west) - <code>onpli_wind_dir_cos1</code> — north–south component (+1 = from the north, −1 = from the south)</p>
+<p>Calm steps are set to (0, 0). A plain sin/cos of 0° gives (0, 1), which the model would read as a northerly. <code>wind_dir_from_sin_cos()</code> converts back to 0–360° (0 = north), returning NaN for calm.</p>
+<div id="cell-17" class="cell" data-execution_count="9">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> wind_dir_to_sin_cos(deg):</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Compass degrees (0 = north, clockwise) -&gt; (sin, cos)."""</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    rad <span class="op">=</span> np.radians(np.asarray(deg, dtype<span class="op">=</span><span class="bu">float</span>))</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.sin(rad), np.cos(rad)</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> wind_dir_from_sin_cos(sin1, cos1):</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""(sin, cos) -&gt; compass degrees in [0, 360), 0 = north.  NaN for calm (0, 0)."""</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>    sin1 <span class="op">=</span> np.asarray(sin1, dtype<span class="op">=</span><span class="bu">float</span>)</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>    cos1 <span class="op">=</span> np.asarray(cos1, dtype<span class="op">=</span><span class="bu">float</span>)</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Round before wrapping so north comes back as 0 rather than 359.99999...</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>    deg <span class="op">=</span> np.<span class="bu">round</span>(np.degrees(np.arctan2(sin1, cos1)), <span class="dv">6</span>) <span class="op">%</span> <span class="dv">360</span></span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.where(np.hypot(sin1, cos1) <span class="op">&lt;</span> <span class="fl">1e-6</span>, np.nan, deg)</span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>calm <span class="op">=</span> (step_df[WIND_DIR_COL] <span class="op">==</span> <span class="dv">0</span>).to_numpy()   <span class="co"># BoM code for calm</span></span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>wind_sin, wind_cos <span class="op">=</span> wind_dir_to_sin_cos(step_df[WIND_DIR_COL])</span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a>step_df[<span class="st">"onpli_wind_dir_sin1"</span>] <span class="op">=</span> np.where(calm, <span class="fl">0.0</span>, wind_sin)</span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>step_df[<span class="st">"onpli_wind_dir_cos1"</span>] <span class="op">=</span> np.where(calm, <span class="fl">0.0</span>, wind_cos)</span>
+<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Checks ---</span></span>
+<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Calm (direction 0) should coincide with zero wind speed</span></span>
+<span id="cb18-23"><a href="#cb18-23" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Calm steps (direction 0): </span><span class="sc">{</span>calm<span class="sc">.</span><span class="bu">sum</span>()<span class="sc">:,}</span><span class="ss">, of which wind speed is 0: "</span></span>
+<span id="cb18-24"><a href="#cb18-24" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"</span><span class="sc">{</span>(step_df.loc[calm, <span class="st">'onpli_wind_speed_kmh'</span>] <span class="op">==</span> <span class="dv">0</span>)<span class="sc">.</span><span class="bu">sum</span>()<span class="sc">:,}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Compass points encode and decode as expected, including across 360/0</span></span>
+<span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a>check <span class="op">=</span> pd.DataFrame({<span class="st">"deg"</span>: [<span class="dv">360</span>, <span class="dv">10</span>, <span class="dv">90</span>, <span class="dv">180</span>, <span class="dv">270</span>, <span class="dv">350</span>]})</span>
+<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a>check[<span class="st">"sin1"</span>], check[<span class="st">"cos1"</span>] <span class="op">=</span> wind_dir_to_sin_cos(check[<span class="st">"deg"</span>])</span>
+<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a>check[<span class="st">"recovered_deg"</span>] <span class="op">=</span> wind_dir_from_sin_cos(check[<span class="st">"sin1"</span>], check[<span class="st">"cos1"</span>])</span>
+<span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(check.<span class="bu">round</span>(<span class="dv">3</span>).to_string(index<span class="op">=</span><span class="va">False</span>))</span>
+<span id="cb18-31"><a href="#cb18-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-32"><a href="#cb18-32" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Round trip on the data recovers every non-calm direction (360 comes back as 0)</span></span>
+<span id="cb18-33"><a href="#cb18-33" aria-hidden="true" tabindex="-1"></a><span class="co">#    and returns NaN for every calm step</span></span>
+<span id="cb18-34"><a href="#cb18-34" aria-hidden="true" tabindex="-1"></a>recovered <span class="op">=</span> wind_dir_from_sin_cos(step_df[<span class="st">"onpli_wind_dir_sin1"</span>], step_df[<span class="st">"onpli_wind_dir_cos1"</span>])</span>
+<span id="cb18-35"><a href="#cb18-35" aria-hidden="true" tabindex="-1"></a>diff <span class="op">=</span> (recovered[<span class="op">~</span>calm] <span class="op">-</span> step_df.loc[<span class="op">~</span>calm, WIND_DIR_COL].to_numpy() <span class="op">+</span> <span class="dv">180</span>) <span class="op">%</span> <span class="dv">360</span> <span class="op">-</span> <span class="dv">180</span></span>
+<span id="cb18-36"><a href="#cb18-36" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Max round-trip error (non-calm): </span><span class="sc">{</span>np<span class="sc">.</span><span class="bu">abs</span>(diff)<span class="sc">.</span><span class="bu">max</span>()<span class="sc">:.1e}</span><span class="ss"> deg;  "</span></span>
+<span id="cb18-37"><a href="#cb18-37" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"calm steps recovered as NaN: </span><span class="sc">{</span>np<span class="sc">.</span>isnan(recovered[calm])<span class="sc">.</span><span class="bu">all</span>()<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Calm steps (direction 0): 42,322, of which wind speed is 0: 42,322
+
+ deg   sin1   cos1  recovered_deg
+ 360 -0.000  1.000            0.0
+  10  0.174  0.985           10.0
+  90  1.000  0.000           90.0
+ 180  0.000 -1.000          180.0
+ 270 -1.000 -0.000          270.0
+ 350 -0.174  0.985          350.0
+
+Max round-trip error (non-calm): 0.0e+00 deg;  calm steps recovered as NaN: True</code></pre>
+</div>
+</div>
+</section>
+<section id="scale-the-weather-covariates-with-the-training-coefficients" class="level3">
+<h3 class="anchored" data-anchor-id="scale-the-weather-covariates-with-the-training-coefficients">Scale the weather covariates with the training coefficients</h3>
+<p>The model was trained on weather covariates scaled with a particular transform, mean and SD (rain log-transformed, log(1 + x), then every covariate converted to a z-score). Any input to the model has to be scaled the same way, so the coefficients are loaded from <code>scalar_scaling.csv</code>, which the training notebook saved in <code>OUTPUT_DIR</code>, rather than recalculated here.</p>
+<ul>
+<li><code>scale_covariate(values, col)</code> converts natural units to the model’s scale, e.g.&nbsp;for weather values set by hand for a prediction.</li>
+<li><code>unscale_covariate(values, col)</code> converts back to natural units: natural = scaled × SD + mean, followed by exp(x) − 1 for log1p columns.</li>
+</ul>
+<p>As a check, the coefficients are also recalculated from the data loaded here. They should match, unless the data or the NA handling has changed since the model was trained.</p>
+<div id="cell-19" class="cell" data-execution_count="10">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Transform, mean and SD for each weather covariate, as used in training</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>SCALING <span class="op">=</span> pd.read_csv(SCALING_PATH, index_col<span class="op">=</span><span class="st">"column"</span>)</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>missing <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> WEATHER_COLS <span class="cf">if</span> col <span class="kw">not</span> <span class="kw">in</span> SCALING.index]</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> missing:</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">raise</span> <span class="pp">KeyError</span>(<span class="ss">f"</span><span class="sc">{</span>SCALING_PATH<span class="sc">}</span><span class="ss"> has no scaling for </span><span class="sc">{</span>missing<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Scaling coefficients (from training):"</span>)</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(SCALING.<span class="bu">round</span>(<span class="dv">3</span>).to_string())</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> scale_covariate(values, col):</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Natural units -&gt; model scale for `col`: log1p if listed, then z-score."""</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>    values <span class="op">=</span> np.asarray(values, dtype<span class="op">=</span><span class="bu">float</span>)</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> SCALING.at[col, <span class="st">"transform"</span>] <span class="op">==</span> <span class="st">"log1p"</span>:</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>        values <span class="op">=</span> np.log1p(values)</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (values <span class="op">-</span> SCALING.at[col, <span class="st">"mean"</span>]) <span class="op">/</span> SCALING.at[col, <span class="st">"sd"</span>]</span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> unscale_covariate(values, col):</span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Model scale -&gt; natural units for `col`: undo the z-score, then expm1 if logged."""</span></span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a>    values <span class="op">=</span> np.asarray(values, dtype<span class="op">=</span><span class="bu">float</span>) <span class="op">*</span> SCALING.at[col, <span class="st">"sd"</span>] <span class="op">+</span> SCALING.at[col, <span class="st">"mean"</span>]</span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> SCALING.at[col, <span class="st">"transform"</span>] <span class="op">==</span> <span class="st">"log1p"</span>:</span>
+<span id="cb20-22"><a href="#cb20-22" aria-hidden="true" tabindex="-1"></a>        values <span class="op">=</span> np.expm1(values)</span>
+<span id="cb20-23"><a href="#cb20-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> values</span>
+<span id="cb20-24"><a href="#cb20-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-25"><a href="#cb20-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-26"><a href="#cb20-26" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> col <span class="kw">in</span> WEATHER_COLS:</span>
+<span id="cb20-27"><a href="#cb20-27" aria-hidden="true" tabindex="-1"></a>    step_df[<span class="ss">f"</span><span class="sc">{</span>col<span class="sc">}</span><span class="ss">_scaled"</span>] <span class="op">=</span> scale_covariate(step_df[col], col)</span>
+<span id="cb20-28"><a href="#cb20-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-29"><a href="#cb20-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Check: recalculating the coefficients from this notebook's data gives the same</span></span>
+<span id="cb20-30"><a href="#cb20-30" aria-hidden="true" tabindex="-1"></a><span class="co"># values as the training run</span></span>
+<span id="cb20-31"><a href="#cb20-31" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> col <span class="kw">in</span> WEATHER_COLS:</span>
+<span id="cb20-32"><a href="#cb20-32" aria-hidden="true" tabindex="-1"></a>    values <span class="op">=</span> step_df[col].to_numpy(dtype<span class="op">=</span><span class="bu">float</span>)</span>
+<span id="cb20-33"><a href="#cb20-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> SCALING.at[col, <span class="st">"transform"</span>] <span class="op">==</span> <span class="st">"log1p"</span>:</span>
+<span id="cb20-34"><a href="#cb20-34" aria-hidden="true" tabindex="-1"></a>        values <span class="op">=</span> np.log1p(values)</span>
+<span id="cb20-35"><a href="#cb20-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> np.allclose([values.mean(), values.std(ddof<span class="op">=</span><span class="dv">1</span>)],</span>
+<span id="cb20-36"><a href="#cb20-36" aria-hidden="true" tabindex="-1"></a>                       SCALING.loc[col, [<span class="st">"mean"</span>, <span class="st">"sd"</span>]].to_numpy(dtype<span class="op">=</span><span class="bu">float</span>)):</span>
+<span id="cb20-37"><a href="#cb20-37" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"Warning: </span><span class="sc">{</span>col<span class="sc">}</span><span class="ss"> mean/SD differ from training — has the data or NA "</span></span>
+<span id="cb20-38"><a href="#cb20-38" aria-hidden="true" tabindex="-1"></a>              <span class="st">"handling changed since the model was trained?"</span>)</span>
+<span id="cb20-39"><a href="#cb20-39" aria-hidden="true" tabindex="-1"></a>        <span class="cf">break</span></span>
+<span id="cb20-40"><a href="#cb20-40" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb20-41"><a href="#cb20-41" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Coefficients recalculated from this data match the training run."</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Scaling coefficients (from training):
+                       transform    mean      sd
+column                                          
+onpli_rain_30min_mm        log1p   0.034   0.203
+onpli_air_temp_c            none  27.811   3.945
+onpli_wet_bulb_temp_c       none  23.792   2.700
+onpli_dew_point_temp_c      none  21.593   4.172
+onpli_rel_humidity_pct      none  72.692  20.675
+onpli_wind_speed_kmh        none   7.198   5.803
+
+Coefficients recalculated from this data match the training run.</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="window_size" class="level2">
+<h2 class="anchored" data-anchor-id="window_size"><code>WINDOW_SIZE</code></h2>
+<p>The size of the local availability window in cells/pixels - should match what was in the training script.</p>
+<div id="cell-21" class="cell" data-execution_count="11">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>WINDOW_SIZE <span class="op">=</span> <span class="dv">51</span>  <span class="co"># the window the model in OUTPUT_DIR was trained with</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="pixel_size" class="level2">
+<h2 class="anchored" data-anchor-id="pixel_size"><code>PIXEL_SIZE</code></h2>
+<p>Raster resolution in CRS units (metres here). Read straight off <code>raster_transform</code> rather than typed in: the transform is the authority on the grid the model is trained against, and a hand-entered value that disagrees with it silently mis-scales the movement kernel — which is parameterised in metres — against a grid measured in pixels.</p>
+<div id="cell-23" class="cell" data-execution_count="12">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># transform.a is the cell width, transform.e the (negative) cell height</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>PIXEL_SIZE <span class="op">=</span> <span class="bu">abs</span>(raster_transform.a)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="kw">not</span> math.isclose(<span class="bu">abs</span>(raster_transform.a), <span class="bu">abs</span>(raster_transform.e)):</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">raise</span> <span class="pp">ValueError</span>(</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"Non-square pixels (</span><span class="sc">{</span><span class="bu">abs</span>(raster_transform.a)<span class="sc">}</span><span class="ss"> x </span><span class="sc">{</span><span class="bu">abs</span>(raster_transform.e)<span class="sc">}</span><span class="ss">); "</span></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"the model assumes square cells."</span></span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Pixel size: </span><span class="sc">{</span>PIXEL_SIZE<span class="sc">}</span><span class="ss"> m  →  window </span><span class="sc">{</span>WINDOW_SIZE<span class="sc">}</span><span class="ss"> px = "</span></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"</span><span class="sc">{</span>WINDOW_SIZE <span class="op">*</span> PIXEL_SIZE<span class="sc">:,.0f}</span><span class="ss"> m across"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Pixel size: 20.0 m  →  window 51 px = 1,020 m across</code></pre>
+</div>
+</div>
+</section>
+<section id="filter_steps_by_window" class="level2">
+<h2 class="anchored" data-anchor-id="filter_steps_by_window"><code>filter_steps_by_window()</code></h2>
+<p>Removes steps whose straight-line displacement exceeds half the spatial window (WINDOW_SIZE × PIXEL_SIZE / 2 metres). Such steps would place the true next location outside the predicted probability map, causing an index error in the loss function.</p>
+<div id="cell-25" class="cell" data-execution_count="13">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>step_df <span class="op">=</span> deepssf.filter_steps_by_window(</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>    step_df, window_size<span class="op">=</span>WINDOW_SIZE, pixel_size<span class="op">=</span>PIXEL_SIZE</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Steps after window filter: </span><span class="sc">{</span><span class="bu">len</span>(step_df)<span class="sc">:,}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Steps after window filter: 242,602</code></pre>
+</div>
+</div>
+</section>
+<section id="params_from_checkpoint" class="level2">
+<h2 class="anchored" data-anchor-id="params_from_checkpoint"><code>params_from_checkpoint()</code></h2>
+<p>Weights only load into a model built with the <em>same</em> architecture, so predicting from a trained model means reproducing its hyper-parameters exactly. Rather than re-typing the training notebook’s constants here — where a habitat branch one layer too shallow fails loudly, but a mis-set <code>pixel_size</code> quietly rescales the movement kernel — <code>params_from_checkpoint()</code> recovers them from the checkpoint and returns the <code>ModelParams</code> to hand to <code>ConvJointModel</code>.</p>
+<p><code>deepssf</code> writes the <code>ModelParams</code> dict into every checkpoint, so for a model trained with 0.3.1 or later it is simply read back. Older checkpoints (anything in <code>outputs/</code> trained before then) do not have it, and the architecture is recovered from the layer shapes instead: a conv weight is <code>[out_channels, in_channels, k, k]</code> and a linear weight <code>[out_features, in_features]</code>, which between them pin down every hyper-parameter that changes a tensor shape — <code>input_channels</code>, <code>output_channels</code>, <code>kernel_size</code>, both conv-layer counts, <code>dense_dim_in_all</code>, <code>dense_dim_hidden</code> and <code>num_movement_params</code>. Either way the result is checked against the saved tensors, so a stored params dict that contradicts its own weights raises here rather than failing later inside <code>load_state_dict</code>.</p>
+<p>Three things it cannot get from the file, passed in below:</p>
+<ul>
+<li><code>image_dim</code> — the habitat branch is fully convolutional, so nothing in the weights records the training window. The movement branch’s flattened size does constrain it, and that is checked, but only to within the slack that max-pooling’s floor division allows (48–55 px all flatten to the same 288 here). <code>WINDOW_SIZE</code> also has to match <code>filter_steps_by_window()</code> above, and is the window the simulations step within.</li>
+<li><code>pixel_size</code> — a property of the raster, read off <code>raster_transform</code>.</li>
+<li><code>device</code> — where the model is being <em>run</em>, which has nothing to do with where it was trained; it defaults to this machine rather than to the recorded value.</li>
+</ul>
+<p><code>n_scalar_covariates</code> only fills the two <code>ModelParams</code> fields that no layer reads; the scalar count that matters is folded into <code>input_channels</code>, which comes off the weights. The check below is the one thing the checkpoint cannot do for us — that the covariates loaded in <em>this</em> notebook are the ones the model was trained on. It compares counts only, so keep <code>LAYER_PATHS</code> in the training run’s order.</p>
+<div id="cell-27" class="cell" data-execution_count="14">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> deepssf.params_from_checkpoint(</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>    <span class="bu">str</span>(CKPT_PATH),</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    image_dim<span class="op">=</span>WINDOW_SIZE,               <span class="co"># not recorded in the weights</span></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>    pixel_size<span class="op">=</span>PIXEL_SIZE,               <span class="co"># from raster_transform</span></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>    n_scalar_covariates<span class="op">=</span><span class="bu">len</span>(SCALAR_COLS),</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>    device<span class="op">=</span>DEVICE,                       <span class="co"># this machine, not the training machine</span></span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, value <span class="kw">in</span> params.to_dict().items():</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>name<span class="sc">:26s}</span><span class="ss">: </span><span class="sc">{</span>value<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a><span class="co"># The covariates in this notebook must be the ones the model was trained on.</span></span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a><span class="co"># input_channels is one channel per raster band plus one per scalar covariate,</span></span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a><span class="co"># so a changed LAYER_PATHS or SCALAR_COLS shows up here as a count mismatch.</span></span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>n_expected <span class="op">=</span> N_SPATIAL_CHANNELS <span class="op">+</span> <span class="bu">len</span>(SCALAR_COLS)</span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> n_expected <span class="op">!=</span> params.input_channels:</span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">raise</span> <span class="pp">ValueError</span>(</span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"</span><span class="sc">{</span>N_SPATIAL_CHANNELS<span class="sc">}</span><span class="ss"> raster bands + </span><span class="sc">{</span><span class="bu">len</span>(SCALAR_COLS)<span class="sc">}</span><span class="ss"> scalars = </span><span class="sc">{</span>n_expected<span class="sc">}</span><span class="ss"> "</span></span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"input channels, but the checkpoint was trained with </span><span class="sc">{</span>params<span class="sc">.</span>input_channels<span class="sc">}</span><span class="ss">. "</span></span>
+<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>        <span class="st">"LAYER_PATHS or SCALAR_COLS differ from the training run."</span></span>
+<span id="cb27-20"><a href="#cb27-20" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb27-21"><a href="#cb27-21" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="sc">{</span>N_SPATIAL_CHANNELS<span class="sc">}</span><span class="ss"> raster bands + </span><span class="sc">{</span><span class="bu">len</span>(SCALAR_COLS)<span class="sc">}</span><span class="ss"> scalars = "</span></span>
+<span id="cb27-22"><a href="#cb27-22" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"</span><span class="sc">{</span>params<span class="sc">.</span>input_channels<span class="sc">}</span><span class="ss"> input channels - matches the checkpoint"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>  batch_size                : 128
+  image_dim                 : 51
+  pixel_size                : 20.0
+  dim_in_nonspatial_to_grid : 13
+  dense_dim_in_nonspatial   : 13
+  dense_dim_hidden          : 128
+  dense_dim_in_all          : 72
+  input_channels            : 25
+  output_channels           : 8
+  kernel_size               : 3
+  stride                    : 1
+  kernel_size_mp            : 2
+  stride_mp                 : 2
+  padding                   : 1
+  num_movement_params       : 12
+  dropout                   : 0.0
+  n_conv_layers_hab         : 8
+  n_conv_layers_move        : 4
+  device                    : mps
+
+12 raster bands + 13 scalars = 25 input channels - matches the checkpoint</code></pre>
+</div>
+</div>
+</section>
+<section id="convjointmodel" class="level2">
+<h2 class="anchored" data-anchor-id="convjointmodel"><code>ConvJointModel</code></h2>
+<p>The deepSSF model! A joint habitat–movement model with two heads: 1. Habitat head — a small CNN applied to the spatial window (env layers + tiled scalars) that outputs a per-pixel log-suitability map. 2. Movement head — a dense MLP (fully-connected layer) that takes the scalar covariates and the previous bearing, and produces parameters for a parametric movement kernel (a mixture of wrapped distributions centred on the current location).</p>
+<p>The two log-probability surfaces are summed pixel-wise to give the joint predicted probability map for the animal’s next step.</p>
+<div id="cell-29" class="cell" data-execution_count="15">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> deepssf.ConvJointModel(params).to(DEVICE)</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>n_params <span class="op">=</span> <span class="bu">sum</span>(p.numel() <span class="cf">for</span> p <span class="kw">in</span> model.parameters())</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Model parameters : </span><span class="sc">{</span>n_params<span class="sc">:,}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Model parameters : 36,349</code></pre>
+</div>
+</div>
+</section>
+<section id="load-the-trained-model" class="level2">
+<h2 class="anchored" data-anchor-id="load-the-trained-model">Load the trained model</h2>
+<p><code>ConvJointModel</code> above is freshly initialised — random weights — so nothing it predicts means anything until a checkpoint is loaded into it. A training run writes three:</p>
+<ul>
+<li><code>best_model.pt</code> — the model to use for <strong>simulation</strong>. Both heads from one epoch, so the joint likelihood is the one that was actually measured.</li>
+<li><code>best_model_habitat.pt</code> / <code>best_model_movement.pt</code> — each head at its own best epoch, tracked across the whole run.</li>
+</ul>
+<p>Mixing them is a deliberate trade: taking the habitat head from a different epoch gives the sharpest habitat surface to <em>map</em>, but the two heads then come from different epochs and the joint model’s likelihood is no longer what either checkpoint recorded. Use it for the landscape predictions below, not for simulating trajectories.</p>
+<p><code>load_checkpoint()</code> loads the weights in place and is strict about shapes, so a mismatch between the constants set above and the trained architecture raises here rather than silently predicting from a partly-random model.</p>
+<div id="cell-31" class="cell" data-execution_count="16">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The joint model — what the simulations further down should use</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>ckpt <span class="op">=</span> deepssf.load_checkpoint(<span class="bu">str</span>(CKPT_PATH), model)</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"best_model.pt          saved on '</span><span class="sc">{</span>ckpt[<span class="st">'checkpoint_criterion'</span>]<span class="sc">}</span><span class="ss">' "</span></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"= </span><span class="sc">{</span>ckpt[<span class="st">'checkpoint_score'</span>]<span class="sc">:.6f}</span><span class="ss">"</span>)</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"                       trained with deepssf </span><span class="sc">{</span>ckpt<span class="sc">.</span>get(<span class="st">'deepssf_version'</span>, <span class="st">'unknown'</span>)<span class="sc">}</span><span class="ss">, "</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"val_loss </span><span class="sc">{</span>ckpt[<span class="st">'val_loss'</span>]<span class="sc">:.6f}</span><span class="ss">"</span>)</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>hab_ckpt <span class="op">=</span> deepssf.load_checkpoint(<span class="bu">str</span>(OUTPUT_DIR <span class="op">/</span> <span class="st">"best_model_habitat.pt"</span>))</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"best_model_habitat.pt  saved on '</span><span class="sc">{</span>hab_ckpt[<span class="st">'checkpoint_criterion'</span>]<span class="sc">}</span><span class="ss">' "</span></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"= </span><span class="sc">{</span>hab_ckpt[<span class="st">'checkpoint_score'</span>]<span class="sc">:.6f}</span><span class="ss">"</span>)</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(a uniform surface over the window scores </span><span class="sc">{</span>np<span class="sc">.</span>log(WINDOW_SIZE <span class="op">**</span> <span class="dv">2</span>)<span class="sc">:.4f}</span><span class="ss">)"</span>)</span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Prediction only — no gradients needed, and this turns off dropout/batchnorm</span></span>
+<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a><span class="co"># training behaviour.</span></span>
+<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a>model.<span class="bu">eval</span>()</span>
+<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a><span class="co"># To map the sharpest habitat surface instead, overwrite just that head:</span></span>
+<span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a><span class="co"># load_head_weights(str(OUTPUT_DIR / "best_model_habitat.pt"), model, "habitat")</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>best_model.pt          saved on 'total' = 4.009099
+                       trained with deepssf 0.3.2, val_loss 4.009099
+best_model_habitat.pt  saved on 'habitat' = 7.654697
+(a uniform surface over the window scores 7.8637)</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<pre><code>ConvJointModel(
+  (scalar_grid_output): Scalar_to_Grid_Block()
+  (conv_habitat): Conv2d_block_spatial(
+    (conv2d): Sequential(
+      (0): Conv2d(25, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (1): ReLU()
+      (2): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (3): ReLU()
+      (4): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (5): ReLU()
+      (6): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (7): ReLU()
+      (8): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (9): ReLU()
+      (10): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (11): ReLU()
+      (12): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (13): ReLU()
+      (14): Conv2d(8, 1, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    )
+  )
+  (conv_movement): Conv2d_block_toFC(
+    (conv2d): Sequential(
+      (0): Conv2d(25, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (1): ReLU()
+      (2): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+      (3): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (4): ReLU()
+      (5): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+      (6): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (7): ReLU()
+      (8): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+      (9): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (10): ReLU()
+      (11): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+      (12): Flatten(start_dim=1, end_dim=-1)
+    )
+  )
+  (fcn_movement_all): FCN_block_all_movement(
+    (ffn): Sequential(
+      (0): Linear(in_features=72, out_features=128, bias=True)
+      (1): Dropout(p=0.0, inplace=False)
+      (2): ReLU()
+      (3): Linear(in_features=128, out_features=128, bias=True)
+      (4): Dropout(p=0.0, inplace=False)
+      (5): ReLU()
+      (6): Linear(in_features=128, out_features=12, bias=True)
+    )
+  )
+  (movement_grid_output): Params_to_Grid_Block_ChV()
+)</code></pre>
+</div>
+</div>
+</section>
+<section id="convert-the-numpy-rasters-loaded-earlier-into-pytorch-tensors" class="level2">
+<h2 class="anchored" data-anchor-id="convert-the-numpy-rasters-loaded-earlier-into-pytorch-tensors">Convert the NumPy rasters loaded earlier into PyTorch tensors</h2>
+<p><code>predict_habitat_landscape()</code>, <code>simulate_trajectory()</code> and <code>simulate_trajectories()</code> all call <code>get_landscape(month_index)</code> to fetch the current environmental layers as a list of 2-D tensors.</p>
+<p>With static (non-seasonal) rasters the <code>month_index</code> argument is unused. For seasonal data (e.g.&nbsp;monthly NDVI composites) you would index into a stack of layers here based on the current month.</p>
+<div id="cell-33" class="cell" data-execution_count="17">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The simulation and prediction functions stack the list returned by</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="co"># get_landscape() along a new channel dimension, so every element must be a *2-D*</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a><span class="co"># tensor.  Unbind the band dimension of any multi-band layer so the channel order</span></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a><span class="co"># matches what MovementDataset fed the model during training.</span></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>landscape_tensors <span class="op">=</span> []</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> arr <span class="kw">in</span> env_layers.values():</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>    t <span class="op">=</span> torch.from_numpy(np.asarray(arr).astype(np.float32))</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>    landscape_tensors.extend([t] <span class="cf">if</span> t.ndim <span class="op">==</span> <span class="dv">2</span> <span class="cf">else</span> <span class="bu">list</span>(t))</span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Landscape channels: </span><span class="sc">{</span><span class="bu">len</span>(landscape_tensors)<span class="sc">}</span><span class="ss">  (each </span><span class="sc">{</span><span class="bu">tuple</span>(landscape_tensors[<span class="dv">0</span>].shape)<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_landscape(_month_index):</span>
+<span id="cb34-14"><a href="#cb34-14" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Returns one 2-D tensor per spatial channel, in the same order as LAYER_PATHS.</span></span>
+<span id="cb34-15"><a href="#cb34-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> landscape_tensors</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Landscape channels: 12  (each (1335, 1715))</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="habitat-selection-across-the-full-landscape" class="level1">
+<h1>Habitat selection across the full landscape</h1>
+<section id="scalar-inputs-for-the-prediction" class="level2">
+<h2 class="anchored" data-anchor-id="scalar-inputs-for-the-prediction">Scalar inputs for the prediction</h2>
+<p>The model needs a value for every column in <code>SCALAR_COLS</code>, in that order: - <strong>Time</strong> (<code>hour_t1_*</code>, <code>yday_t1_*</code>, <code>dt_hour</code>) - <code>deepssf.make_simulation_inputs()</code> builds the sin/cos encodings from a day of the year (<code>PRED_YDAY</code>, integer) and a fractional hour (<code>PRED_HOUR</code>, float). Its <code>time_between_steps</code> argument becomes the <code>dt_hour</code> input, so it is set to the collars’ ~30 min fix interval (<code>PRED_DT_HOUR</code>) rather than left at its default of 1 hour. - <strong>Weather</strong> (<code>*_scaled</code>) - set by hand in natural units in <code>PRED_WEATHER</code>, then scaled with the coefficients stored in <code>SCALING</code>. - <strong>Wind direction</strong> (<code>onpli_wind_dir_sin1</code> / <code>_cos1</code>) - set in degrees in <code>PRED_WIND_DIR_DEG</code> (0 or 360 = north, the direction the wind blows <em>from</em>), and encoded as a sin/cos pair, or (0, 0) when the wind speed is 0 (calm).</p>
+<p>Weather varies a lot with season and time of day, so the first cell summarises the training data, both overall and for steps near the chosen moment, as a guide to realistic values. <code>make_scalar_row()</code> then assembles the full row, warning about any weather value outside the training range.</p>
+<div id="cell-35" class="cell" data-execution_count="18">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Predict for one moment in time: 9:30 am on day 200.</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>PRED_YDAY <span class="op">=</span> <span class="dv">200</span>  <span class="co"># day of the year to predict for (1–365, integer)</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>PRED_HOUR <span class="op">=</span> <span class="fl">9.5</span>  <span class="co"># hour of the day to predict for (0–24, float)</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Steps "near" the chosen moment: within ±15 days and ±1 hour, wrapping across</span></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a><span class="co"># the new year and midnight</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>NEAR_DAYS, NEAR_HOURS <span class="op">=</span> <span class="dv">15</span>, <span class="dv">1</span></span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>yday_diff <span class="op">=</span> (step_df[<span class="st">"yday_t1"</span>] <span class="op">-</span> PRED_YDAY <span class="op">+</span> <span class="fl">182.5</span>) <span class="op">%</span> <span class="dv">365</span> <span class="op">-</span> <span class="fl">182.5</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>hour_diff <span class="op">=</span> (step_df[<span class="st">"hour_t1"</span>] <span class="op">-</span> PRED_HOUR <span class="op">+</span> <span class="dv">12</span>) <span class="op">%</span> <span class="dv">24</span> <span class="op">-</span> <span class="dv">12</span></span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>near <span class="op">=</span> (yday_diff.<span class="bu">abs</span>() <span class="op">&lt;=</span> NEAR_DAYS) <span class="op">&amp;</span> (hour_diff.<span class="bu">abs</span>() <span class="op">&lt;=</span> NEAR_HOURS)</span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Model inputs needed (SCALAR_COLS):"</span>)</span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> col <span class="kw">in</span> SCALAR_COLS:</span>
+<span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> col <span class="kw">in</span> TIME_COLS:</span>
+<span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a>        source <span class="op">=</span> <span class="st">"PRED_YDAY / PRED_HOUR / PRED_DT_HOUR"</span></span>
+<span id="cb36-16"><a href="#cb36-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> col.endswith(<span class="st">"_scaled"</span>):</span>
+<span id="cb36-17"><a href="#cb36-17" aria-hidden="true" tabindex="-1"></a>        source <span class="op">=</span> <span class="ss">f'PRED_WEATHER["</span><span class="sc">{</span>col<span class="sc">.</span>removesuffix(<span class="st">"_scaled"</span>)<span class="sc">}</span><span class="ss">"]'</span></span>
+<span id="cb36-18"><a href="#cb36-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb36-19"><a href="#cb36-19" aria-hidden="true" tabindex="-1"></a>        source <span class="op">=</span> <span class="st">"PRED_WIND_DIR_DEG"</span></span>
+<span id="cb36-20"><a href="#cb36-20" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>col<span class="sc">:&lt;32}</span><span class="ss"> &lt;- </span><span class="sc">{</span>source<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb36-21"><a href="#cb36-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-22"><a href="#cb36-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Weather in natural units: the full training range, and typical values near the</span></span>
+<span id="cb36-23"><a href="#cb36-23" aria-hidden="true" tabindex="-1"></a><span class="co"># chosen moment</span></span>
+<span id="cb36-24"><a href="#cb36-24" aria-hidden="true" tabindex="-1"></a>near_weather <span class="op">=</span> step_df.loc[near, WEATHER_COLS]</span>
+<span id="cb36-25"><a href="#cb36-25" aria-hidden="true" tabindex="-1"></a>weather_summary <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb36-26"><a href="#cb36-26" aria-hidden="true" tabindex="-1"></a>    <span class="st">"min"</span>:        step_df[WEATHER_COLS].<span class="bu">min</span>(),</span>
+<span id="cb36-27"><a href="#cb36-27" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mean"</span>:       step_df[WEATHER_COLS].mean(),</span>
+<span id="cb36-28"><a href="#cb36-28" aria-hidden="true" tabindex="-1"></a>    <span class="st">"max"</span>:        step_df[WEATHER_COLS].<span class="bu">max</span>(),</span>
+<span id="cb36-29"><a href="#cb36-29" aria-hidden="true" tabindex="-1"></a>    <span class="st">"near_5%"</span>:    near_weather.quantile(<span class="fl">0.05</span>),</span>
+<span id="cb36-30"><a href="#cb36-30" aria-hidden="true" tabindex="-1"></a>    <span class="st">"near_median"</span>: near_weather.median(),</span>
+<span id="cb36-31"><a href="#cb36-31" aria-hidden="true" tabindex="-1"></a>    <span class="st">"near_95%"</span>:   near_weather.quantile(<span class="fl">0.95</span>),</span>
+<span id="cb36-32"><a href="#cb36-32" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb36-33"><a href="#cb36-33" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Weather, all steps vs the </span><span class="sc">{</span>near<span class="sc">.</span><span class="bu">sum</span>()<span class="sc">:,}</span><span class="ss"> steps within ±</span><span class="sc">{</span>NEAR_DAYS<span class="sc">}</span><span class="ss"> days "</span></span>
+<span id="cb36-34"><a href="#cb36-34" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"and ±</span><span class="sc">{</span>NEAR_HOURS<span class="sc">}</span><span class="ss"> h of day </span><span class="sc">{</span>PRED_YDAY<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>PRED_HOUR<span class="sc">:g}</span><span class="ss"> h:"</span>)</span>
+<span id="cb36-35"><a href="#cb36-35" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(weather_summary.<span class="bu">round</span>(<span class="dv">2</span>).to_string())</span>
+<span id="cb36-36"><a href="#cb36-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-37"><a href="#cb36-37" aria-hidden="true" tabindex="-1"></a><span class="co"># Wind direction is circular, so a mean is meaningless: show the most common</span></span>
+<span id="cb36-38"><a href="#cb36-38" aria-hidden="true" tabindex="-1"></a><span class="co"># directions instead (0 = calm is counted separately)</span></span>
+<span id="cb36-39"><a href="#cb36-39" aria-hidden="true" tabindex="-1"></a>near_dir <span class="op">=</span> step_df.loc[near, WIND_DIR_COL]</span>
+<span id="cb36-40"><a href="#cb36-40" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Wind direction near the chosen moment: </span><span class="sc">{</span>(near_dir <span class="op">==</span> <span class="dv">0</span>)<span class="sc">.</span>mean()<span class="sc">:.0%}</span><span class="ss"> calm; "</span></span>
+<span id="cb36-41"><a href="#cb36-41" aria-hidden="true" tabindex="-1"></a>      <span class="st">"most common directions (deg from north, </span><span class="sc">% o</span><span class="st">f non-calm steps):"</span>)</span>
+<span id="cb36-42"><a href="#cb36-42" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>((near_dir[near_dir <span class="op">&gt;</span> <span class="dv">0</span>].value_counts(normalize<span class="op">=</span><span class="va">True</span>).head(<span class="dv">5</span>) <span class="op">*</span> <span class="dv">100</span>).<span class="bu">round</span>(<span class="dv">1</span>).to_string())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Model inputs needed (SCALAR_COLS):
+  hour_t1_sin1                     &lt;- PRED_YDAY / PRED_HOUR / PRED_DT_HOUR
+  hour_t1_cos1                     &lt;- PRED_YDAY / PRED_HOUR / PRED_DT_HOUR
+  yday_t1_sin1                     &lt;- PRED_YDAY / PRED_HOUR / PRED_DT_HOUR
+  yday_t1_cos1                     &lt;- PRED_YDAY / PRED_HOUR / PRED_DT_HOUR
+  dt_hour                          &lt;- PRED_YDAY / PRED_HOUR / PRED_DT_HOUR
+  onpli_rain_30min_mm_scaled       &lt;- PRED_WEATHER["onpli_rain_30min_mm"]
+  onpli_air_temp_c_scaled          &lt;- PRED_WEATHER["onpli_air_temp_c"]
+  onpli_wet_bulb_temp_c_scaled     &lt;- PRED_WEATHER["onpli_wet_bulb_temp_c"]
+  onpli_dew_point_temp_c_scaled    &lt;- PRED_WEATHER["onpli_dew_point_temp_c"]
+  onpli_rel_humidity_pct_scaled    &lt;- PRED_WEATHER["onpli_rel_humidity_pct"]
+  onpli_wind_speed_kmh_scaled      &lt;- PRED_WEATHER["onpli_wind_speed_kmh"]
+  onpli_wind_dir_sin1              &lt;- PRED_WIND_DIR_DEG
+  onpli_wind_dir_cos1              &lt;- PRED_WIND_DIR_DEG
+
+Weather, all steps vs the 1,668 steps within ±15 days and ±1 h of day 200, 9.5 h:
+                         min   mean   max  near_5%  near_median  near_95%
+onpli_rain_30min_mm      0.0   0.08  34.2      0.0          0.0       0.0
+onpli_air_temp_c        11.4  27.83  39.3     22.4         26.8      30.2
+onpli_wet_bulb_temp_c   11.0  23.79  29.6     16.1         19.8      21.7
+onpli_dew_point_temp_c   3.4  21.58  28.3      8.0         15.0      18.9
+onpli_rel_humidity_pct  13.0  72.58  98.0     31.0         47.0      69.0
+onpli_wind_speed_kmh     0.0   7.23  37.1      1.8         14.8      22.3
+
+Wind direction near the chosen moment: 4% calm; most common directions (deg from north, % of non-calm steps):
+onpli_wind_dir_deg
+110.0    18.1
+120.0    16.2
+100.0    14.9
+130.0    12.9
+90.0     11.5</code></pre>
+</div>
+</div>
+<div id="cell-36" class="cell" data-execution_count="19">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Weather for the prediction, in natural units.  The defaults are roughly the</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a><span class="co"># medians near day 200 at 09:30 (dry-season mornings).  Temperature, wet bulb,</span></span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a><span class="co"># dew point and humidity are physically linked, so change them together, e.g. by</span></span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a><span class="co"># taking them from the same row of the summary above.</span></span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>PRED_WEATHER <span class="op">=</span> {</span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"onpli_rain_30min_mm"</span>:    <span class="fl">0.0</span>,</span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"onpli_air_temp_c"</span>:       <span class="fl">27.0</span>,</span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"onpli_wet_bulb_temp_c"</span>:  <span class="fl">19.8</span>,</span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">"onpli_dew_point_temp_c"</span>: <span class="fl">15.0</span>,</span>
+<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">"onpli_rel_humidity_pct"</span>: <span class="fl">47.0</span>,</span>
+<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"onpli_wind_speed_kmh"</span>:   <span class="fl">15.0</span>,</span>
+<span id="cb38-12"><a href="#cb38-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb38-13"><a href="#cb38-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-14"><a href="#cb38-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Direction the wind blows FROM, in degrees clockwise from north (0 or 360 =</span></span>
+<span id="cb38-15"><a href="#cb38-15" aria-hidden="true" tabindex="-1"></a><span class="co"># north).  Ignored when the wind speed is 0, which is encoded as calm.</span></span>
+<span id="cb38-16"><a href="#cb38-16" aria-hidden="true" tabindex="-1"></a>PRED_WIND_DIR_DEG <span class="op">=</span> <span class="fl">110.0</span></span>
+<span id="cb38-17"><a href="#cb38-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-18"><a href="#cb38-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Hours between steps, which is also the model's dt_hour input.  The collars fixed</span></span>
+<span id="cb38-19"><a href="#cb38-19" aria-hidden="true" tabindex="-1"></a><span class="co"># about every 30 min, so values far from 0.5 are outside what the model saw.</span></span>
+<span id="cb38-20"><a href="#cb38-20" aria-hidden="true" tabindex="-1"></a>PRED_DT_HOUR <span class="op">=</span> <span class="fl">0.5</span></span>
+<span id="cb38-21"><a href="#cb38-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-22"><a href="#cb38-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-23"><a href="#cb38-23" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_scalar_row(yday, hour, weather<span class="op">=</span><span class="va">None</span>, wind_dir_deg<span class="op">=</span><span class="va">None</span>, dt_hour<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb38-24"><a href="#cb38-24" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""One row of model inputs, in SCALAR_COLS order, from natural-unit values.</span></span>
+<span id="cb38-25"><a href="#cb38-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-26"><a href="#cb38-26" aria-hidden="true" tabindex="-1"></a><span class="co">    Defaults to PRED_WEATHER, PRED_WIND_DIR_DEG and PRED_DT_HOUR.  Prints a</span></span>
+<span id="cb38-27"><a href="#cb38-27" aria-hidden="true" tabindex="-1"></a><span class="co">    warning for any weather value outside the range seen in training.</span></span>
+<span id="cb38-28"><a href="#cb38-28" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb38-29"><a href="#cb38-29" aria-hidden="true" tabindex="-1"></a>    weather <span class="op">=</span> PRED_WEATHER <span class="cf">if</span> weather <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> weather</span>
+<span id="cb38-30"><a href="#cb38-30" aria-hidden="true" tabindex="-1"></a>    wind_dir_deg <span class="op">=</span> PRED_WIND_DIR_DEG <span class="cf">if</span> wind_dir_deg <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> wind_dir_deg</span>
+<span id="cb38-31"><a href="#cb38-31" aria-hidden="true" tabindex="-1"></a>    dt_hour <span class="op">=</span> PRED_DT_HOUR <span class="cf">if</span> dt_hour <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> dt_hour</span>
+<span id="cb38-32"><a href="#cb38-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-33"><a href="#cb38-33" aria-hidden="true" tabindex="-1"></a>    missing <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> WEATHER_COLS <span class="cf">if</span> col <span class="kw">not</span> <span class="kw">in</span> weather]</span>
+<span id="cb38-34"><a href="#cb38-34" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> missing:</span>
+<span id="cb38-35"><a href="#cb38-35" aria-hidden="true" tabindex="-1"></a>        <span class="cf">raise</span> <span class="pp">KeyError</span>(<span class="ss">f"weather is missing </span><span class="sc">{</span>missing<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb38-36"><a href="#cb38-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-37"><a href="#cb38-37" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Time: same encodings the simulation uses, in TIME_COLS order</span></span>
+<span id="cb38-38"><a href="#cb38-38" aria-hidden="true" tabindex="-1"></a>    time_row <span class="op">=</span> deepssf.make_simulation_inputs(</span>
+<span id="cb38-39"><a href="#cb38-39" aria-hidden="true" tabindex="-1"></a>        n_steps<span class="op">=</span><span class="dv">1</span>, starting_yday<span class="op">=</span>yday, starting_hour<span class="op">=</span>hour, time_between_steps<span class="op">=</span>dt_hour,</span>
+<span id="cb38-40"><a href="#cb38-40" aria-hidden="true" tabindex="-1"></a>    )[<span class="dv">0</span>][<span class="dv">0</span>]</span>
+<span id="cb38-41"><a href="#cb38-41" aria-hidden="true" tabindex="-1"></a>    values <span class="op">=</span> <span class="bu">dict</span>(<span class="bu">zip</span>(TIME_COLS, time_row, strict<span class="op">=</span><span class="va">True</span>))</span>
+<span id="cb38-42"><a href="#cb38-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-43"><a href="#cb38-43" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Weather: scaled with the training coefficients</span></span>
+<span id="cb38-44"><a href="#cb38-44" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> col <span class="kw">in</span> WEATHER_COLS:</span>
+<span id="cb38-45"><a href="#cb38-45" aria-hidden="true" tabindex="-1"></a>        lo, hi <span class="op">=</span> step_df[col].<span class="bu">min</span>(), step_df[col].<span class="bu">max</span>()</span>
+<span id="cb38-46"><a href="#cb38-46" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> lo <span class="op">&lt;=</span> weather[col] <span class="op">&lt;=</span> hi:</span>
+<span id="cb38-47"><a href="#cb38-47" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"Warning: </span><span class="sc">{</span>col<span class="sc">}</span><span class="ss"> = </span><span class="sc">{</span>weather[col]<span class="sc">}</span><span class="ss"> is outside the training range (</span><span class="sc">{</span>lo<span class="sc">}</span><span class="ss"> to </span><span class="sc">{</span>hi<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb38-48"><a href="#cb38-48" aria-hidden="true" tabindex="-1"></a>        values[<span class="ss">f"</span><span class="sc">{</span>col<span class="sc">}</span><span class="ss">_scaled"</span>] <span class="op">=</span> scale_covariate([weather[col]], col)[<span class="dv">0</span>]</span>
+<span id="cb38-49"><a href="#cb38-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-50"><a href="#cb38-50" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Wind direction: sin/cos, or (0, 0) for calm</span></span>
+<span id="cb38-51"><a href="#cb38-51" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> weather[<span class="st">"onpli_wind_speed_kmh"</span>] <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb38-52"><a href="#cb38-52" aria-hidden="true" tabindex="-1"></a>        wind_sin, wind_cos <span class="op">=</span> <span class="fl">0.0</span>, <span class="fl">0.0</span></span>
+<span id="cb38-53"><a href="#cb38-53" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb38-54"><a href="#cb38-54" aria-hidden="true" tabindex="-1"></a>        wind_sin, wind_cos <span class="op">=</span> wind_dir_to_sin_cos(wind_dir_deg)</span>
+<span id="cb38-55"><a href="#cb38-55" aria-hidden="true" tabindex="-1"></a>    values[<span class="st">"onpli_wind_dir_sin1"</span>] <span class="op">=</span> wind_sin</span>
+<span id="cb38-56"><a href="#cb38-56" aria-hidden="true" tabindex="-1"></a>    values[<span class="st">"onpli_wind_dir_cos1"</span>] <span class="op">=</span> wind_cos</span>
+<span id="cb38-57"><a href="#cb38-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-58"><a href="#cb38-58" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.array([values[col] <span class="cf">for</span> col <span class="kw">in</span> SCALAR_COLS], dtype<span class="op">=</span>np.float32)</span>
+<span id="cb38-59"><a href="#cb38-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-60"><a href="#cb38-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-61"><a href="#cb38-61" aria-hidden="true" tabindex="-1"></a><span class="co"># Check: rebuilding rows of the training data from their natural-unit values gives</span></span>
+<span id="cb38-62"><a href="#cb38-62" aria-hidden="true" tabindex="-1"></a><span class="co"># exactly the model inputs the model was trained on</span></span>
+<span id="cb38-63"><a href="#cb38-63" aria-hidden="true" tabindex="-1"></a>check_rows <span class="op">=</span> step_df[step_df[<span class="st">"yday_t1"</span>] <span class="op">&lt;=</span> <span class="dv">365</span>].sample(<span class="dv">200</span>, random_state<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb38-64"><a href="#cb38-64" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> _, row <span class="kw">in</span> check_rows.iterrows():</span>
+<span id="cb38-65"><a href="#cb38-65" aria-hidden="true" tabindex="-1"></a>    rebuilt <span class="op">=</span> make_scalar_row(</span>
+<span id="cb38-66"><a href="#cb38-66" aria-hidden="true" tabindex="-1"></a>        row[<span class="st">"yday_t1"</span>], row[<span class="st">"hour_t1"</span>],</span>
+<span id="cb38-67"><a href="#cb38-67" aria-hidden="true" tabindex="-1"></a>        weather<span class="op">=</span>row[WEATHER_COLS].to_dict(),</span>
+<span id="cb38-68"><a href="#cb38-68" aria-hidden="true" tabindex="-1"></a>        wind_dir_deg<span class="op">=</span>row[WIND_DIR_COL],</span>
+<span id="cb38-69"><a href="#cb38-69" aria-hidden="true" tabindex="-1"></a>        dt_hour<span class="op">=</span>row[<span class="st">"dt_hour"</span>],</span>
+<span id="cb38-70"><a href="#cb38-70" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb38-71"><a href="#cb38-71" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> np.allclose(rebuilt, row[SCALAR_COLS].to_numpy(dtype<span class="op">=</span><span class="bu">float</span>), atol<span class="op">=</span><span class="fl">1e-5</span>), row.name</span>
+<span id="cb38-72"><a href="#cb38-72" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"make_scalar_row() reproduces the training inputs for </span><span class="sc">{</span><span class="bu">len</span>(check_rows)<span class="sc">}</span><span class="ss"> sampled steps</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb38-73"><a href="#cb38-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-74"><a href="#cb38-74" aria-hidden="true" tabindex="-1"></a>scalars_pred <span class="op">=</span> make_scalar_row(PRED_YDAY, PRED_HOUR)</span>
+<span id="cb38-75"><a href="#cb38-75" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Model inputs for day </span><span class="sc">{</span>PRED_YDAY<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>PRED_HOUR<span class="sc">:g}</span><span class="ss"> h:"</span>)</span>
+<span id="cb38-76"><a href="#cb38-76" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(pd.Series(scalars_pred, index<span class="op">=</span>SCALAR_COLS).<span class="bu">round</span>(<span class="dv">3</span>).to_string())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>make_scalar_row() reproduces the training inputs for 200 sampled steps
+
+Model inputs for day 200, 9.5 h:
+hour_t1_sin1                     0.609
+hour_t1_cos1                    -0.793
+yday_t1_sin1                    -0.294
+yday_t1_cos1                    -0.956
+dt_hour                          0.500
+onpli_rain_30min_mm_scaled      -0.165
+onpli_air_temp_c_scaled         -0.205
+onpli_wet_bulb_temp_c_scaled    -1.479
+onpli_dew_point_temp_c_scaled   -1.580
+onpli_rel_humidity_pct_scaled   -1.243
+onpli_wind_speed_kmh_scaled      1.344
+onpli_wind_dir_sin1              0.940
+onpli_wind_dir_cos1             -0.342</code></pre>
+</div>
+</div>
+</section>
+<section id="predict_habitat_landscape" class="level2">
+<h2 class="anchored" data-anchor-id="predict_habitat_landscape"><code>predict_habitat_landscape()</code></h2>
+<p>Everything so far has run the model on a <code>WINDOW_SIZE</code> crop centred on the animal. But the habitat sub-network is <em>fully convolutional</em> — 3x3 convolutions with stride 1 and padding 1, no pooling and no dense layer — so the same trained filters can be swept across the entire raster in a single pass. Convolution is translation-equivariant, so the value at a pixel is exactly what the model would have produced for a window centred on that pixel.</p>
+<p>That gives a landscape-wide habitat selection surface. Read it as a <strong>relative ranking of cells</strong>: “if the animal were somewhere on this landscape, how attractive is each cell”. It deliberately says nothing about whether the animal could <em>reach</em> a cell in one step — that constraint lives in the movement kernel, which takes no part here. The two are only combined over a local window, which is what <code>simulate_next_step()</code> does.</p>
+<ul>
+<li><strong>Inputs</strong>:
+<ul>
+<li><code>model</code>
+<ul>
+<li>the trained model; only <code>model.conv_habitat</code> is used</li>
+</ul></li>
+<li><code>landscape_rasters</code>
+<ul>
+<li>the spatial covariates as a list of 2-D tensors, in the same order and on the same scaling as training — i.e.&nbsp;exactly what <code>get_landscape()</code> returns</li>
+</ul></li>
+<li><code>scalars</code>
+<ul>
+<li>the scalar covariates for the moment being predicted, in <code>SCALAR_COLS</code> order, as built by <code>make_scalar_row()</code> above. Each value is broadcast to a constant layer covering the whole landscape (the same thing <code>Scalar_to_Grid_Block</code> does for a window — that block can’t be reused here because its output size is fixed to <code>WINDOW_SIZE</code>)</li>
+</ul></li>
+<li><code>normalise</code>
+<ul>
+<li>subtract the log-sum-exp over the whole landscape, making the surface a log-probability that sums to 1 across all valid cells</li>
+</ul></li>
+<li><code>edge_buffer</code>
+<ul>
+<li>how many border pixels to mask as <code>NaN</code>. Defaults to <code>habitat_edge_buffer(model)</code> — the exact width the zero-padding reaches, 1 pixel per habitat conv layer. Those pixels saw padding rather than landscape and are not comparable with the interior</li>
+</ul></li>
+<li><code>chunk_rows</code>
+<ul>
+<li>process this many raster rows at a time. A full-landscape activation is several hundred MB, enough to exhaust a GPU; the chunks overlap by <code>edge_buffer</code> so the result is identical to a single pass</li>
+</ul></li>
+</ul></li>
+<li><strong>Outputs</strong>: a <code>[height, width]</code> NumPy array of log-probabilities, <code>NaN</code> in the border. Take <code>np.exp()</code> for probabilities.</li>
+</ul>
+<div id="cell-38" class="cell" data-execution_count="20">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>habitat_log <span class="op">=</span> deepssf.predict_habitat_landscape(</span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>    model,</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>    landscape_rasters<span class="op">=</span>get_landscape(<span class="dv">0</span>),   <span class="co"># static layers → month index 0</span></span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>    scalars<span class="op">=</span>scalars_pred,</span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Surface </span><span class="sc">{</span>habitat_log<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">, masked border "</span></span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"</span><span class="sc">{</span>deepssf<span class="sc">.</span>habitat_edge_buffer(model)<span class="sc">}</span><span class="ss"> px"</span>)</span>
+<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"log-probability range: </span><span class="sc">{</span>np<span class="sc">.</span>nanmin(habitat_log)<span class="sc">:.2f}</span><span class="ss"> to "</span></span>
+<span id="cb40-9"><a href="#cb40-9" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"</span><span class="sc">{</span>np<span class="sc">.</span>nanmax(habitat_log)<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
+<span id="cb40-10"><a href="#cb40-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"probabilities sum to  : </span><span class="sc">{</span>np<span class="sc">.</span>nansum(np.exp(habitat_log))<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Surface (1335, 1715), masked border 8 px
+log-probability range: -16.46 to -11.17
+probabilities sum to  : 1.0000</code></pre>
+</div>
+</div>
+<section id="plot-the-landscape-scale-habitat-selection-surface" class="level3">
+<h3 class="anchored" data-anchor-id="plot-the-landscape-scale-habitat-selection-surface">Plot the landscape-scale habitat selection surface</h3>
+<p>Plotted on the <strong>log</strong> scale. Across 9.5 million cells the probabilities are tiny (a uniform surface would give ~1e-7 per cell) and a handful of very attractive cells dominate the linear range, so a linear colour scale washes the whole map out. The colour limits are clipped to percentiles for the same reason.</p>
+<div id="cell-40" class="cell" data-execution_count="21">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">14</span>, <span class="fl">5.5</span>))</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Percentile limits: a few extreme cells otherwise dominate the colour range</span></span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>vmin, vmax <span class="op">=</span> np.nanpercentile(habitat_log, [<span class="dv">1</span>, <span class="fl">99.9</span>])</span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>rasterio.plot.show(</span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>    habitat_log, transform<span class="op">=</span>raster_transform, ax<span class="op">=</span>axes[<span class="dv">0</span>],</span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>    cmap<span class="op">=</span><span class="st">"viridis"</span>, vmin<span class="op">=</span>vmin, vmax<span class="op">=</span>vmax,</span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="ss">f"Habitat selection (log prob) — yday </span><span class="sc">{</span>PRED_YDAY<span class="sc">}</span><span class="ss">, "</span></span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"</span><span class="sc">{</span>PRED_HOUR<span class="sc">:.0f}</span><span class="ss">:00"</span>)</span>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a>rasterio.plot.show(</span>
+<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a>    habitat_log, transform<span class="op">=</span>raster_transform, ax<span class="op">=</span>axes[<span class="dv">1</span>],</span>
+<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a>    cmap<span class="op">=</span><span class="st">"viridis"</span>, vmin<span class="op">=</span>vmin, vmax<span class="op">=</span>vmax,</span>
+<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb42-17"><a href="#cb42-17" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].plot(</span>
+<span id="cb42-18"><a href="#cb42-18" aria-hidden="true" tabindex="-1"></a>    step_df[<span class="st">"x1_"</span>], step_df[<span class="st">"y1_"</span>],</span>
+<span id="cb42-19"><a href="#cb42-19" aria-hidden="true" tabindex="-1"></a>    <span class="st">"r."</span>, alpha<span class="op">=</span><span class="fl">0.25</span>, markersize<span class="op">=</span><span class="fl">0.6</span>, label<span class="op">=</span><span class="st">"observed GPS fixes"</span>,</span>
+<span id="cb42-20"><a href="#cb42-20" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb42-21"><a href="#cb42-21" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].legend(loc<span class="op">=</span><span class="st">"upper right"</span>, markerscale<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb42-22"><a href="#cb42-22" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_title(<span class="st">"with observed locations overlaid"</span>)</span>
+<span id="cb42-23"><a href="#cb42-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-24"><a href="#cb42-24" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax <span class="kw">in</span> axes:</span>
+<span id="cb42-25"><a href="#cb42-25" aria-hidden="true" tabindex="-1"></a>    ax.set_xlabel(<span class="st">"Easting (m, projected)"</span>)</span>
+<span id="cb42-26"><a href="#cb42-26" aria-hidden="true" tabindex="-1"></a>    ax.set_ylabel(<span class="st">"Northing (m, projected)"</span>)</span>
+<span id="cb42-27"><a href="#cb42-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-28"><a href="#cb42-28" aria-hidden="true" tabindex="-1"></a><span class="co"># One colourbar for both panels</span></span>
+<span id="cb42-29"><a href="#cb42-29" aria-hidden="true" tabindex="-1"></a>fig.colorbar(axes[<span class="dv">0</span>].images[<span class="dv">0</span>], ax<span class="op">=</span>axes, shrink<span class="op">=</span><span class="fl">0.8</span>, label<span class="op">=</span><span class="st">"log probability"</span>)</span>
+<span id="cb42-30"><a href="#cb42-30" aria-hidden="true" tabindex="-1"></a>plt.savefig(<span class="bu">str</span>(OUTPUT_DIR <span class="op">/</span> <span class="st">"habitat_landscape.png"</span>), dpi<span class="op">=</span><span class="dv">120</span>, bbox_inches<span class="op">=</span><span class="st">"tight"</span>)</span>
+<span id="cb42-31"><a href="#cb42-31" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="deepssf_piggies_predict_landcover_files/figure-html/cell-22-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+
+
+
+</section>
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a><div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" role="list">
+<div id="ref-Signer2019-fi" class="csl-entry" role="listitem">
+Signer, Johannes, John Fieberg, and Tal Avgar. 2019. <span>“<span class="nocase">Animal movement tools (amt): R package for managing tracking data and conducting habitat selection analyses</span>.”</span> <em>Ecology and Evolution</em> 9 (January): 880–90. <a href="https://doi.org/10.1002/ece3.4823">https://doi.org/10.1002/ece3.4823</a>.
+</div>
+</div></section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
