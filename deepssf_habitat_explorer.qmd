@@ -1,0 +1,41 @@
+---
+title: "Habitat Selection Explorer"
+author:
+  - name: Scott Forrest
+    url: https://swforrest.github.io/
+    email: "scottwforrest@gmail.com"
+date: today
+format:
+  html:
+    page-layout: full
+    toc: false
+---
+
+How strongly does the fitted deepSSF model select each part of the landscape at different
+times of day, seasons and weather? Pick an hour, a season and a weather preset to see the
+model's habitat-selection surface, and the log selection ratio of each landcover class.
+
+- **What is mapped:** the habitat surface of the fitted model (the habitat head only, so
+  every cell is treated as reachable), within 500 m of an observed fix. Brighter cells are
+  more strongly selected. The colour scale is the same for every preset, so maps can be
+  compared directly.
+- **Weather presets:** real half-hours observed at the Oenpelli station in that season
+  (same month), within an hour of the chosen time:
+  - *cool & dry* and *hot & humid*: the 10th and 90th percentiles of wet bulb temperature,
+    without rain;
+  - *typical*: closest to the median of every weather variable;
+  - *rain*: the median rain amount among half-hours with rain. There is none in the early
+    dry season, and only some hours in the late dry season have it.
+- **Bar chart:** the log selection ratio within the mask. 0 means the class is used in
+  proportion to its availability; positive values mean it is selected for.
+
+The maps are precomputed (347 scenarios). The methods, and partial dependence plots that
+separate the effects of time and weather, are in the
+[deepSSF Inference](deepssf_piggies_inference_landcover.ipynb) notebook. A local app that
+recomputes maps for any time and weather is described in `apps/README.md`.
+
+```{=html}
+<iframe src="outputs/landcover/2026-11-17_1/web/habitat_explorer.html"
+        title="Habitat selection explorer" width="100%" height="860"
+        style="border: 1px solid #d8dee4; border-radius: 6px;" loading="lazy"></iframe>
+```

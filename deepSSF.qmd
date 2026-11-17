@@ -14,3 +14,9 @@ Fitting the deepSSF model to the pig data.
 
 [**deepSSF Predictions**](deepssf_piggies_predict_hab-prob_start.ipynb) \
 Generating predictions from the fitted deepSSF model. We produce maps of hourly habitat selection (without movement), seasonal and (sub-)seasonal expected distributions of pigs, and (sub-)seasonal connectivity maps.
+
+[**deepSSF Inference**](deepssf_piggies_inference_landcover.ipynb) \
+How the fitted landcover and weather model's habitat selection and movement change with the time of day, the season and the weather: partial dependence, feature importance and the movement kernel.
+
+[**Habitat Selection Explorer**](deepssf_habitat_explorer.qmd) \
+An interactive map of the model's habitat selection for any hour, season and weather preset.

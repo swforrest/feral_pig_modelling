@@ -3,6 +3,8 @@ project:
   output-dir: docs
   resources:
     - outputs/**/*.html # interactive folium maps, embedded as iframes in the deepSSF predictions page
+    - outputs/**/web/manifest.json # habitat explorer: preset list and class selection ratios
+    - outputs/**/web/overlays/*.webp # habitat explorer: precomputed habitat-selection maps
 
 execute:
   freeze: auto # re-render only when source changes
@@ -41,6 +43,8 @@ website:
           - deepSSF.qmd
           - deepssf_piggies_train.ipynb
           - deepssf_piggies_predict_hab-prob_start.ipynb
+          - deepssf_piggies_inference_landcover.ipynb
+          - deepssf_habitat_explorer.qmd
 
 format:
   html:
