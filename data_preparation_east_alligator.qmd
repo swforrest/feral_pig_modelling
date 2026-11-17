@@ -930,6 +930,77 @@ cat("\n\n:::\n")
 
 ```
 
+## Plot the correlations between the weather variables within Oenpelli
+
+```{r}
+#| fig-width: 7
+#| fig-height: 6
+
+# numeric Oenpelli variables, without the station prefix
+onpli_vars <- oenpelli_weather %>% select(where(is.numeric)) %>% names() %>% str_remove("^onpli_")
+
+onpli_cor <- oenpelli_weather %>%
+  select(paste0("onpli_", onpli_vars)) %>%
+  rename_with(~ str_remove(.x, "^onpli_")) %>%
+  cor(use = "pairwise.complete.obs")
+
+round(onpli_cor, 2)
+
+# correlation matrix as a heatmap, keeping the variable order on both axes
+onpli_cor %>%
+  as_tibble(rownames = "var1") %>%
+  pivot_longer(-var1, names_to = "var2", values_to = "r") %>%
+  mutate(var1 = factor(var1, levels = onpli_vars),
+         var2 = factor(var2, levels = rev(onpli_vars))) %>%
+  ggplot(aes(x = var1, y = var2, fill = r)) +
+  geom_tile(colour = "white") +
+  geom_text(aes(label = round(r, 2)), size = 3) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, limits = c(-1, 1)) +
+  coord_equal() +
+  labs(title = "Correlations between Oenpelli weather variables",
+       subtitle = "Pearson's r, pairwise complete observations",
+       x = NULL, y = NULL, fill = "r") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+# every pair of Oenpelli variables (each column of combn() is one pair)
+onpli_pairs <- combn(onpli_vars, 2)
+
+cat("::: {.panel-tabset}\n\n")
+
+for(i in seq_len(ncol(onpli_pairs))) {
+
+  var_x <- onpli_pairs[1, i]
+  var_y <- onpli_pairs[2, i]
+
+  r <- onpli_cor[var_x, var_y]
+
+  # different units on each axis, so no 1:1 line or equal coordinates
+  p <- ggplot(oenpelli_weather, aes(x = .data[[paste0("onpli_", var_x)]],
+                                    y = .data[[paste0("onpli_", var_y)]])) +
+    geom_point(alpha = 0.1, size = 0.5) +
+    labs(title = paste0(var_x, " vs ", var_y),
+         subtitle = paste0("Pearson's r = ", round(r, 2)),
+         x = weather_labels[[var_x]], y = weather_labels[[var_y]]) +
+    theme_bw()
+
+  # one tab per pair of variables: heading first, then the plot
+  cat("\n\n### ", var_x, " vs ", var_y, "\n\n")
+  print(p)
+
+}
+
+cat("\n\n:::\n")
+
+```
+
 # Import environmental data
 
 ## Sentinel-2 data
