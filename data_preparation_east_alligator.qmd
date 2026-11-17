@@ -221,7 +221,7 @@ hist(as.numeric(pig_all_steps$dt_min))
 
 ```
 
-## Calculate the speed for fixes \> 5 satellites
+## Check speed distribution
 
 ```{r}
 
@@ -244,6 +244,8 @@ pig_all_steps %>% filter(n_sat > 5) %>%
   theme_classic()
 
 ```
+
+## Calculate the speed for fixes \> 5 satellites
 
 ```{r}
 
@@ -1236,6 +1238,45 @@ plot(landcover_dummy, col = c("grey90", "darkgreen"), legend = FALSE,
 
 ```
 
+### Pull out water (with the NAs)
+
+```{r}
+
+plot(landcover_dummy[["veg_water"]])
+plot(is.na(landcover_dummy[["veg_water"]]))
+
+water_layer <- terra::subst(landcover_dummy[["veg_water"]], NA, 1)
+plot(water_layer)
+
+terra::writeRaster(water_layer, "mapping/water_east_alligator.tif", overwrite = TRUE)
+
+```
+
+### Save the dummy landcover variables
+
+```{r}
+
+# drop the partial water layer
+landcover_dummy[["veg_water"]] <- water_layer
+
+# maxnl defaults to 16, so set it explicitly or the last few classes are dropped
+plot(landcover_dummy, col = c("grey90", "darkgreen"), legend = FALSE,
+     maxnl = nlyr(landcover_dummy), axes = FALSE,
+     mar = c(1.5, 1.5, 2, 1.5))
+
+# replace NAs with 0s
+landcover_dummy <- terra::subst(landcover_dummy, NA, 0)
+
+# maxnl defaults to 16, so set it explicitly or the last few classes are dropped
+plot(landcover_dummy, col = c("grey90", "darkgreen"), legend = FALSE,
+     maxnl = nlyr(landcover_dummy), axes = FALSE,
+     mar = c(1.5, 1.5, 2, 1.5))
+
+terra::writeRaster(landcover_dummy, "mapping/landcover_dummy_east_alligator.tif", overwrite = TRUE)
+
+```
+
+
 ## Extract landcover values at the pig locations
 
 ```{r}
@@ -1315,20 +1356,6 @@ ggsave("outputs/east_alligator_landcover_combined_wGPS.png",
 ```{r}
 
 terra::writeRaster(landcover_rast_merged, "mapping/landcover_east_alligator.tif", overwrite = TRUE)
-
-```
-
-### Pull out water (with the NAs)
-
-```{r}
-
-plot(landcover_dummy[["veg_water"]])
-plot(is.na(landcover_dummy[["veg_water"]]))
-
-water_layer <- terra::subst(landcover_dummy[["veg_water"]], NA, 1)
-plot(water_layer)
-
-terra::writeRaster(water_layer, "mapping/water_east_alligator.tif", overwrite = TRUE)
 
 ```
 
