@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Scott Forrest">
-<meta name="dcterms.date" content="2026-11-17">
+<meta name="dcterms.date" content="2026-11-18">
 
 <title>deepSSF Predictions – Kakadu Pig Modelling</title>
 <style>
@@ -267,7 +267,7 @@ div.csl-indent {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">November 17, 2026</p>
+      <p class="date">November 18, 2026</p>
     </div>
   </div>
   
@@ -376,7 +376,7 @@ torch 2.12.0</code></pre>
 <span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="co"># The training run to predict from — where its checkpoints and scaling</span></span>
 <span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="co"># coefficients were written by deepssf_piggies_train_landcover.ipynb, and where</span></span>
 <span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="co"># the outputs below are saved.</span></span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>OUTPUT_DIR <span class="op">=</span> Path(<span class="st">"outputs/landcover/2026-11-17_1"</span>)</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>OUTPUT_DIR <span class="op">=</span> Path(<span class="st">"outputs/landcover/2026-11-18_1"</span>)</span>
 <span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>CKPT_PATH <span class="op">=</span> OUTPUT_DIR <span class="op">/</span> <span class="st">"best_model.pt"</span></span>
 <span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>SCALING_PATH <span class="op">=</span> OUTPUT_DIR <span class="op">/</span> <span class="st">"scalar_scaling.csv"</span>  <span class="co"># weather-covariate scaling used in training</span></span>
 <span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a></span>
@@ -390,7 +390,7 @@ torch 2.12.0</code></pre>
 <span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Checkpoints:"</span>, <span class="st">", "</span>.join(<span class="bu">sorted</span>(p.name <span class="cf">for</span> p <span class="kw">in</span> OUTPUT_DIR.glob(<span class="st">"*.pt"</span>))))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Output directory: outputs/landcover/2026-11-17_1
+<pre><code>Output directory: outputs/landcover/2026-11-18_1
 Checkpoints: best_model.pt, best_model_habitat.pt, best_model_movement.pt</code></pre>
 </div>
 </div>
@@ -423,7 +423,7 @@ Checkpoints: best_model.pt, best_model_habitat.pt, best_model_movement.pt</code>
 <span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>raw_df.head()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>/var/folders/w0/qvtthgds7m133drnqxl72fwr0000gn/T/ipykernel_16915/152548867.py:1: DtypeWarning: Columns (0: jabru_cloud_amount_2, 1: jabru_cloud_amount_3) have mixed types. Specify dtype option on import or set low_memory=False.
+<pre><code>/var/folders/w0/qvtthgds7m133drnqxl72fwr0000gn/T/ipykernel_77941/152548867.py:1: DtypeWarning: Columns (0: jabru_cloud_amount_2, 1: jabru_cloud_amount_3) have mixed types. Specify dtype option on import or set low_memory=False.
   raw_df = pd.read_csv(CSV_PATH)</code></pre>
 </div>
 <div class="cell-output cell-output-stdout">
@@ -1092,7 +1092,7 @@ Coefficients recalculated from this data match the training run.</code></pre>
 <div id="cell-21" class="cell" data-execution_count="11">
 <details class="code-fold">
 <summary>Show code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>WINDOW_SIZE <span class="op">=</span> <span class="dv">51</span>  <span class="co"># the window the model in OUTPUT_DIR was trained with</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>WINDOW_SIZE <span class="op">=</span> <span class="dv">75</span>  <span class="co"># the window the model in OUTPUT_DIR was trained with</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 </section>
@@ -1114,7 +1114,7 @@ Coefficients recalculated from this data match the training run.</code></pre>
 <span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"</span><span class="sc">{</span>WINDOW_SIZE <span class="op">*</span> PIXEL_SIZE<span class="sc">:,.0f}</span><span class="ss"> m across"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Pixel size: 20.0 m  →  window 51 px = 1,020 m across</code></pre>
+<pre><code>Pixel size: 20.0 m  →  window 75 px = 1,500 m across</code></pre>
 </div>
 </div>
 </section>
@@ -1130,7 +1130,7 @@ Coefficients recalculated from this data match the training run.</code></pre>
 <span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Steps after window filter: </span><span class="sc">{</span><span class="bu">len</span>(step_df)<span class="sc">:,}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Steps after window filter: 242,602</code></pre>
+<pre><code>Steps after window filter: 245,672</code></pre>
 </div>
 </div>
 </section>
@@ -1173,12 +1173,12 @@ Coefficients recalculated from this data match the training run.</code></pre>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>  batch_size                : 128
-  image_dim                 : 51
+  image_dim                 : 75
   pixel_size                : 20.0
   dim_in_nonspatial_to_grid : 13
   dense_dim_in_nonspatial   : 13
   dense_dim_hidden          : 128
-  dense_dim_in_all          : 72
+  dense_dim_in_all          : 128
   input_channels            : 25
   output_channels           : 8
   kernel_size               : 3
@@ -1188,7 +1188,7 @@ Coefficients recalculated from this data match the training run.</code></pre>
   padding                   : 1
   num_movement_params       : 12
   dropout                   : 0.0
-  n_conv_layers_hab         : 8
+  n_conv_layers_hab         : 4
   n_conv_layers_move        : 4
   device                    : mps
 
@@ -1208,7 +1208,7 @@ Coefficients recalculated from this data match the training run.</code></pre>
 <span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Model parameters : </span><span class="sc">{</span>n_params<span class="sc">:,}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Model parameters : 36,349</code></pre>
+<pre><code>Model parameters : 41,181</code></pre>
 </div>
 </div>
 </section>
@@ -1244,10 +1244,10 @@ Coefficients recalculated from this data match the training run.</code></pre>
 <span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a><span class="co"># load_head_weights(str(OUTPUT_DIR / "best_model_habitat.pt"), model, "habitat")</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>best_model.pt          saved on 'total' = 4.009099
-                       trained with deepssf 0.3.2, val_loss 4.009099
-best_model_habitat.pt  saved on 'habitat' = 7.654697
-(a uniform surface over the window scores 7.8637)</code></pre>
+<pre><code>best_model.pt          saved on 'total' = 4.111142
+                       trained with deepssf 0.3.2, val_loss 4.111142
+best_model_habitat.pt  saved on 'habitat' = 8.386823
+(a uniform surface over the window scores 8.6350)</code></pre>
 </div>
 <div class="cell-output cell-output-display" data-execution_count="16">
 <pre><code>ConvJointModel(
@@ -1260,15 +1260,7 @@ best_model_habitat.pt  saved on 'habitat' = 7.654697
       (3): ReLU()
       (4): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
       (5): ReLU()
-      (6): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-      (7): ReLU()
-      (8): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-      (9): ReLU()
-      (10): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-      (11): ReLU()
-      (12): Conv2d(8, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-      (13): ReLU()
-      (14): Conv2d(8, 1, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (6): Conv2d(8, 1, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
     )
   )
   (conv_movement): Conv2d_block_toFC(
@@ -1290,7 +1282,7 @@ best_model_habitat.pt  saved on 'habitat' = 7.654697
   )
   (fcn_movement_all): FCN_block_all_movement(
     (ffn): Sequential(
-      (0): Linear(in_features=72, out_features=128, bias=True)
+      (0): Linear(in_features=128, out_features=128, bias=True)
       (1): Dropout(p=0.0, inplace=False)
       (2): ReLU()
       (3): Linear(in_features=128, out_features=128, bias=True)
@@ -1401,22 +1393,22 @@ best_model_habitat.pt  saved on 'habitat' = 7.654697
   onpli_wind_dir_sin1              &lt;- PRED_WIND_DIR_DEG
   onpli_wind_dir_cos1              &lt;- PRED_WIND_DIR_DEG
 
-Weather, all steps vs the 1,668 steps within ±15 days and ±1 h of day 200, 9.5 h:
+Weather, all steps vs the 1,684 steps within ±15 days and ±1 h of day 200, 9.5 h:
                          min   mean   max  near_5%  near_median  near_95%
-onpli_rain_30min_mm      0.0   0.08  34.2      0.0          0.0       0.0
-onpli_air_temp_c        11.4  27.83  39.3     22.4         26.8      30.2
-onpli_wet_bulb_temp_c   11.0  23.79  29.6     16.1         19.8      21.7
-onpli_dew_point_temp_c   3.4  21.58  28.3      8.0         15.0      18.9
-onpli_rel_humidity_pct  13.0  72.58  98.0     31.0         47.0      69.0
-onpli_wind_speed_kmh     0.0   7.23  37.1      1.8         14.8      22.3
+onpli_rain_30min_mm      0.0   0.08  34.2     0.00          0.0       0.0
+onpli_air_temp_c        11.4  27.82  39.3    22.40         26.8      30.2
+onpli_wet_bulb_temp_c   11.0  23.79  29.6    16.10         19.8      21.7
+onpli_dew_point_temp_c   3.4  21.59  28.3     8.06         15.0      18.9
+onpli_rel_humidity_pct  13.0  72.66  98.0    31.00         47.0      69.0
+onpli_wind_speed_kmh     0.0   7.21  37.1     1.80         14.8      22.3
 
 Wind direction near the chosen moment: 4% calm; most common directions (deg from north, % of non-calm steps):
 onpli_wind_dir_deg
-110.0    18.1
+110.0    18.2
 120.0    16.2
 100.0    14.9
-130.0    12.9
-90.0     11.5</code></pre>
+130.0    12.8
+90.0     11.6</code></pre>
 </div>
 </div>
 <div id="cell-36" class="cell" data-execution_count="19">
@@ -1569,8 +1561,8 @@ onpli_wind_dir_cos1             -0.342</code></pre>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>
-Surface (1335, 1715), masked border 8 px
-log-probability range: -16.46 to -11.17
+Surface (1335, 1715), masked border 4 px
+log-probability range: -80.71 to -11.40
 probabilities sum to  : 1.0000</code></pre>
 </div>
 </div>

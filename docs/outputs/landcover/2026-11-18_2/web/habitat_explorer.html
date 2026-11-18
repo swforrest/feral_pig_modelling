@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Habitat selection explorer</title>
+<link rel="icon" href="data:,">
+<!-- Template: apps/habitat_explorer.html.  The inference notebook copies it next to
+     manifest.json and the overlay images in outputs/landcover/<run>/web/. -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<style>
+  :root {
+    --bg: #ffffff; --panel: #f7f7f5; --ink: #1f2328; --ink-2: #57606a; --rule: #d8dee4;
+    --accent: #2b6cb0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16181b; --panel: #1e2125; --ink: #e6e6e6; --ink-2: #a3aab2; --rule: #353a40;
+      --accent: #63a4e8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #controls { display: flex; flex-wrap: wrap; gap: 10px 18px; padding: 10px 12px;
+              background: var(--panel); border-bottom: 1px solid var(--rule); align-items: end; }
+  .ctl { display: flex; flex-direction: column; gap: 3px; min-width: 120px; }
+  .ctl label { font-size: 12px; color: var(--ink-2); }
+  .ctl select, .ctl input { font: inherit; color: var(--ink); background: var(--bg);
+                            border: 1px solid var(--rule); border-radius: 6px; padding: 4px 6px; }
+  .ctl output { font-weight: 600; font-size: 13px; }
+  #main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; height: calc(100vh - 64px);
+          min-height: 520px; }
+  #map { height: 100%; }
+  #side { padding: 12px 14px; overflow-y: auto; border-left: 1px solid var(--rule); }
+  #side h2 { font-size: 14px; margin: 4px 0 6px; }
+  #side p.note { font-size: 12px; color: var(--ink-2); margin: 4px 0 10px; }
+  #bars text { fill: var(--ink); font-size: 11px; }
+  #bars .axis { stroke: var(--ink-2); stroke-width: 1; }
+  #bars .grid { stroke: var(--rule); stroke-width: 1; }
+  #legend { margin: 10px 0; }
+  #legend .ramp { height: 10px; border-radius: 3px; }
+  #legend .ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-2); }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td { padding: 2px 4px; border-bottom: 1px solid var(--rule); }
+  td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  #tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg);
+         font-size: 12px; padding: 4px 7px; border-radius: 4px; opacity: 0; transition: opacity .1s; }
+  @media (max-width: 760px) {
+    #main { grid-template-columns: 1fr; height: auto; }
+    #map { height: 60vh; }
+    #side { border-left: 0; border-top: 1px solid var(--rule); }
+  }
+</style>
+</head>
+<body>
+<div id="controls"></div>
+<div id="main">
+  <div id="map"></div>
+  <div id="side">
+    <h2>Selection by landcover class</h2>
+    <p class="note">Log selection ratio within the availability mask: 0 = used in proportion
+      to availability, positive = selected, negative = avoided.</p>
+    <svg id="bars" width="310" height="10" role="img" aria-label="Log selection ratio by class"></svg>
+    <div id="legend"></div>
+    <h2>Scenario</h2>
+    <table id="inputs"></table>
+    <p class="note" id="source"></p>
+  </div>
+</div>
+<div id="tip"></div>
+<script>
+"use strict";
+const tip = document.getElementById("tip");
+
+fetch("manifest.json").then(r => r.json()).then(init).catch(err => {
+  document.getElementById("controls").textContent =
+    "Could not load manifest.json (" + err + "). Serve this folder over http.";
+});
+
+function init(m) {
+  const bounds = L.latLngBounds(m.bounds);
+  // Whole zoom levels: fractional zoom leaves hairline seams between basemap tiles
+  const map = L.map("map").fitBounds(bounds);
+  const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18, attribution: "&copy; OpenStreetMap contributors" });
+  const sat = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 18, attribution: "Esri World Imagery" });
+  sat.addTo(map);
+  const overlay = L.imageOverlay(m.presets[0].file, bounds, { opacity: 0.85 }).addTo(map);
+  L.control.layers({ "Satellite": sat, "OpenStreetMap": osm },
+                   { "Habitat selection": overlay }, { collapsed: false }).addTo(map);
+
+  // One control per dimension; numeric dimensions with many values get a slider
+  const state = {};
+  const controls = document.getElementById("controls");
+  for (const dim of m.dimensions) {
+    state[dim.key] = dim.default ?? dim.values[0].value;
+    const box = document.createElement("div");
+    box.className = "ctl";
+    const label = document.createElement("label");
+    label.textContent = dim.label;
+    box.appendChild(label);
+    if (dim.slider) {
+      const out = document.createElement("output");
+      const input = document.createElement("input");
+      input.type = "range"; input.min = 0; input.max = dim.values.length - 1; input.step = 1;
+      input.value = dim.values.findIndex(v => v.value === state[dim.key]);
+      const show = () => { out.textContent = dim.values[input.value].label; };
+      input.addEventListener("input", () => { state[dim.key] = dim.values[input.value].value;
+                                              show(); update(); });
+      show();
+      box.append(out, input);
+    } else {
+      const sel = document.createElement("select");
+      for (const v of dim.values) {
+        const o = document.createElement("option");
+        o.value = v.value; o.textContent = v.label; sel.appendChild(o);
+      }
+      sel.value = state[dim.key];
+      sel.addEventListener("change", () => { state[dim.key] = sel.value; update(); });
+      box.appendChild(sel);
+    }
+    controls.appendChild(box);
+  }
+
+  // Colour legend (fixed across presets)
+  const leg = document.getElementById("legend");
+  leg.innerHTML = '<div class="ramp" style="background:linear-gradient(90deg,' +
+    m.colour.stops.join(",") + ')"></div><div class="ends"><span>' + m.colour.low_label +
+    "</span><span>" + m.colour.high_label + "</span></div>";
+
+  const byKey = new Map(m.presets.map(p => [m.dimensions.map(d => String(p[d.key])).join("|"), p]));
+
+  function update() {
+    const key = m.dimensions.map(d => String(state[d.key])).join("|");
+    const p = byKey.get(key);
+    if (!p) {
+      overlay.setOpacity(0);
+      drawBars(m, null);
+      document.getElementById("inputs").innerHTML = "";
+      document.getElementById("source").textContent =
+        "No weather of this kind was observed in this season within an hour of this time.";
+      return;
+    }
+    overlay.setUrl(p.file);
+    overlay.setOpacity(0.85);
+    drawBars(m, p);
+    const rows = Object.entries(p.inputs).map(([k, v]) => "<tr><td>" + k + "</td><td>" + v + "</td></tr>");
+    document.getElementById("inputs").innerHTML = rows.join("");
+    document.getElementById("source").textContent = p.source || "";
+  }
+  update();
+}
+
+function drawBars(m, p) {
+  const svg = document.getElementById("bars");
+  const classes = m.classes.filter(c => c.plot);
+  const rowH = 24, left = 150, right = 12, width = 310, top = 6;
+  const height = top + rowH * classes.length + 26;
+  svg.setAttribute("height", height);
+  const lim = m.log_sr_limit;
+  const x = v => left + (Math.max(-lim, Math.min(lim, v)) + lim) / (2 * lim) * (width - left - right);
+  let s = "";
+  for (const t of [-lim, -lim / 2, 0, lim / 2, lim]) {
+    s += '<line class="grid" x1="' + x(t) + '" x2="' + x(t) + '" y1="' + top + '" y2="' +
+         (height - 22) + '"/><text x="' + x(t) + '" y="' + (height - 8) +
+         '" text-anchor="middle">' + (+t.toFixed(1)) + "</text>";
+  }
+  classes.forEach((c, i) => {
+    const y = top + i * rowH;
+    const v = p ? p.log_sr[c.name] : null;
+    s += '<text x="' + (left - 6) + '" y="' + (y + rowH / 2 + 4) + '" text-anchor="end">' + c.label + "</text>";
+    if (v !== null && v !== undefined && isFinite(v)) {
+      const x0 = x(0), x1 = x(v);
+      s += '<rect data-tip="' + c.label + ": log SR " + v.toFixed(2) + '" x="' + Math.min(x0, x1) +
+           '" y="' + (y + 4) + '" width="' + Math.max(Math.abs(x1 - x0), 1) + '" height="' + (rowH - 8) +
+           '" rx="3" fill="' + c.colour + '" stroke="#555" stroke-width="0.6"/>';
+    }
+  });
+  s += '<line class="axis" x1="' + x(0) + '" x2="' + x(0) + '" y1="' + top + '" y2="' + (height - 22) + '"/>';
+  svg.innerHTML = s;
+  svg.querySelectorAll("rect").forEach(r => {
+    r.addEventListener("mousemove", e => { tip.textContent = r.dataset.tip; tip.style.opacity = 1;
+      tip.style.left = (e.clientX + 12) + "px"; tip.style.top = (e.clientY + 12) + "px"; });
+    r.addEventListener("mouseleave", () => { tip.style.opacity = 0; });
+  });
+}
+</script>
+</body>
+</html>
