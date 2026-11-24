@@ -109,7 +109,8 @@ pig_gps <- pig_gps %>%
   distinct(.keep_all = T) %>%
   mutate(id = `Device ID`,
          name = name_map[as.character(`Device ID`)],
-         `Date & Time [Local]` = with_tz(`Date & Time [GMT]`, tzone = "Australia/Darwin"), # i think it's already in Darwin time
+         `Date & Time [Local]` = with_tz(`Date & Time [GMT]`, 
+                                         tzone = "Australia/Darwin"), # i think it's already in Darwin time
          # `Date & Time [Local]` = force_tz(`Date & Time [GMT]`, tzone = "Australia/Darwin"),
          time = `Date & Time [Local]`,
          lon = `Longitude`,
@@ -500,16 +501,26 @@ for(i in 1:length(pig_ids)) {
 
 ```{r}
 
-pig_all_steps %>% #filter(name != "Unknown1") %>% 
+pig_all_steps %>% 
   ggplot(aes(x = t1_, y = name, colour = name)) +
   geom_point(alpha = 0.5, size = 1) + 
   scale_colour_viridis_d() +
+  scale_y_discrete(limits = rev) +
   theme_classic() +
   labs(x = "Date", y = "Pig ID") +
   theme(legend.position = "none") 
 
 ggsave("outputs/east_alligator_pig_timeline.png", 
        width = 250, height = 150, units = "mm", scale = 0.75, dpi = 600)
+
+```
+
+## Export dataframe without covariates
+
+```{r}
+
+# set the name to match the input data frame
+write_csv(pig_all_steps, "data/pig_all_steps_east_alligator_20261015.csv")
 
 ```
 
