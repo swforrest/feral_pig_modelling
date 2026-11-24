@@ -1,0 +1,1908 @@
+---
+title: "Shooting responses"
+subtitle: "East Alligator"
+author: "Scott Forrest"
+date: "`r Sys.Date()`"
+execute: 
+  cache: false
+  warning: false
+bibliography: paperpile.bib
+toc: true
+number-sections: false
+format: 
+  html:
+    self-contained: false
+    code-fold: true
+    code-summary: "Show code"
+    code-tools: true
+    df-print: paged
+    code-line-numbers: true
+    code-overflow: scroll
+    fig-format: png
+    fig-dpi: 300
+  pdf:
+    fig-format: png
+    fig-dpi: 300
+    geometry: 
+      - top=30mm
+      - left=30mm
+editor:
+  source
+abstract: |
+  Here we are looking at how feral pigs respond to aerial shooting operations in the East Alligator region of Kakadu National Park, Northern Territory, Australia. We have GPS tracking data from pigs in the area, and we are looking at how their movement patterns change before and after shooting events. Because the pig's behaviour is temporally variable, we also need to ensure that the timing of the shooting operations isn't correlated with ordinary behavioural changes (which it seems to be). Therefore, as a control, we also run the same analyses on data at the same time of day, but 3 days before shooting occurred, and as an additional control, for pigs that were outside the area shooting was occurring.
+  
+  We look at changes in their movement behaviour, measured as the distance between successive GPS fixes (step length), as well as their habitat use, measured as the proportion of time they spend in different vegetation classes.
+---
+
+# Load packages
+
+```{r}
+#| label: packages
+#| message: false
+#| warning: false
+
+library(tidyverse)
+packages <- c("amt", "lubridate",
+              "terra", "sf",
+              "beepr", "tictoc",
+              "leaflet", "tidyterra")
+walk(packages, require, character.only = T)
+
+```
+
+# Create directories for outputs
+
+```{r}
+
+# general outputs directory
+outputs_dir <- "outputs/east_alligator/shooting_responses/"
+dir.create(outputs_dir, showWarnings = FALSE, recursive = TRUE)
+
+# for plots with veg categories
+outputs_veg_dir <- file.path(outputs_dir, "veg/")
+dir.create(outputs_veg_dir, showWarnings = FALSE, recursive = TRUE)
+
+```
+
+# Import GPS tracking data
+
+```{r}
+
+pig_all_steps <- read_csv("data/pigs_east_alligator_steps_covs_20261015.csv")
+
+# Convert timezone after import (resets to GMT)
+pig_all_steps <- pig_all_steps %>% 
+  mutate(
+    t1_  = with_tz(t1_, tzone = "Australia/Darwin"),
+    t2_ = with_tz(t2_, tzone = "Australia/Darwin")
+    )
+
+```
+
+## Create sf object of pig data
+
+```{r}
+
+# convert to an sf object (x1_/y1_ are in GDA94 / GA Lambert, EPSG:3112)
+# and reproject to WGS84 (EPSG:4326) for leaflet
+pig_all_steps_sf <- pig_all_steps %>%
+  st_as_sf(coords = c("x1_", "y1_"), crs = 3112) %>%
+  st_transform(crs = 4326)
+
+```
+
+## Create a bounding box around the pig data to crop the shooting data and other layers by
+
+```{r}
+
+pig_aoi <- st_bbox(pig_all_steps_sf) %>% 
+  st_as_sfc() %>% 
+  st_transform(crs = 3112) %>% 
+  st_buffer(dist = 2500) %>%
+  st_bbox() %>% # the buffer creates curved corners so we need to get the bounding box of the buffered area
+  st_as_sfc()
+
+# save the bounding box as a shapefile
+# pig_aoi %>% 
+#   st_transform(crs = 4326) %>%
+#   st_write("mapping/pig_aoi_wgs84.geojson", driver = "GeoJSON", delete_dsn = TRUE)
+
+```
+
+# Shooting data
+
+## Import shooting data from late 2025
+
+In the region where we have pig GPS tracking data, there are two main shooting events. 
+
+```{r}
+
+# Import shapefile of shooting locations using sf - most of the data in East Alligator is actually from late 2025
+shooting_locations_2025 <- st_read("mapping/pig_shooting_2026.shp")
+# st_crs(shooting_locations_2025)
+
+```
+
+## Import shooting data from 2026
+
+```{r}
+
+shooting_locations_2026 <- read_csv("data/FeralControl_March_Oct2026.csv")
+
+shooting_locations_2026 <- shooting_locations_2026 %>%
+  st_as_sf(coords = c("Coordinate_XMin", "Coordinate_YMin"), crs = 4326) %>%
+  st_transform(crs = st_crs(shooting_locations_2025))
+
+```
+
+## Plot all of the shooting locations
+
+The late 2025 shooting operations are in red, and the 2026 shooting operations are in blue. The pig GPS locations are coloured by individual.
+
+```{r}
+
+ggplot() +
+  geom_sf(data = pig_all_steps_sf, aes(colour = name), size = 0.1, alpha = 0.1) +
+  geom_sf(data = shooting_locations_2025, colour = "red", alpha = 0.5, size = 0.5) +
+  geom_sf(data = shooting_locations_2026, colour = "blue", alpha = 0.5, size = 0.5) +
+  coord_sf() +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+## Combine the two shooting datasets
+
+```{r}
+
+# keep relevant columns
+shooting_locations_2025_clean <- shooting_locations_2025 %>% dplyr::select(Time, FeralSpec0, NumberShot, NumberObs0)
+shooting_locations_2025_clean <- shooting_locations_2025_clean %>% dplyr::rename("FeralSpecies" = FeralSpec0,
+                                                                       "NumberObserved" = NumberObs0)
+
+# keep relevant columns
+shooting_locations_2026_clean <- shooting_locations_2026 %>% dplyr::select(Time, FeralSpecies, NumberShot, NumberObserved)
+
+# combine the two datasets
+shooting_locations <- bind_rows(shooting_locations_2025_clean, shooting_locations_2026_clean)
+
+```
+
+## Crop the shooting locations to the extent of the pig GPS locations
+
+```{r}
+
+# crop to the extent of the pig GPS locations
+filtered_shooting_locations <- shooting_locations %>% 
+  st_transform(crs = 3112) %>% 
+  st_crop(pig_aoi)
+
+# plot
+ggplot() +
+  geom_sf(data = pig_all_steps_sf, aes(colour = name), size = 0.1, alpha = 0.1) +
+  geom_sf(data = filtered_shooting_locations, colour = "red", size = 0.5) +
+  coord_sf() +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+# Overlap between shooting locations and pig GPS locations
+
+## Ensure the timezones match
+
+```{r}
+
+# check the timezone of the pig GPS locations
+tz(pig_all_steps_sf$t1_)
+
+# Add a posixct time column to the shooting locations
+filtered_shooting_locations <- filtered_shooting_locations %>% mutate(
+  shoot_id = row_number(),
+  shoot_time = as.POSIXct(Time, format = "%d-%b-%Y %H:%M:%S", tz = "Australia/Darwin")
+)
+
+# check the timezone of the shooting locations
+tz(filtered_shooting_locations$shoot_time)
+
+# temporal range of the shooting data
+min(filtered_shooting_locations$shoot_time)
+max(filtered_shooting_locations$shoot_time)
+
+```
+
+## Shooting locations through time
+
+```{r}
+
+ggplot() +
+  geom_sf(data = filtered_shooting_locations, aes(colour = shoot_time), size = 0.5) +
+  coord_sf() +
+  labs(colour = "Shooting\ntime") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+```
+
+## Timeline of the GPS data collection
+
+The shooting events are shown as the red dashed lines. Each shooting event normally covers several days.
+
+```{r}
+
+ggplot() +
+  geom_vline(xintercept = filtered_shooting_locations$shoot_time, 
+             colour = "red", linetype = "dashed", linewidth = 0.25) +
+  geom_point(data = pig_all_steps,
+             aes(x = t1_, y = name, colour = name),
+             alpha = 0.5, size = 1) + 
+  scale_colour_viridis_d() +
+  scale_y_discrete(limits = rev) +
+  theme_classic() +
+  labs(x = "Date", y = "Pig GPS tracking data") +
+  theme(legend.position = "none") 
+
+ggsave(paste0(outputs_dir, "pig_east_alligator_shoot_timeline.png"), 
+       width = 250, height = 150, units = "mm", scale = 0.75, dpi = 600)
+
+```
+
+### Hours of shooting
+
+```{r}
+
+filtered_shooting_locations <- filtered_shooting_locations %>% 
+  mutate(
+    shoot_hms = lubridate::hour(shoot_time) + lubridate::minute(shoot_time)/60 + lubridate::second(shoot_time)/3600
+  ) 
+
+filtered_shooting_locations %>%
+  ggplot() +
+  geom_histogram(aes(x = shoot_hms), bins = 50, fill = "red", colour = "black") +
+  scale_x_datetime("Shooting time") +
+  theme_bw()
+
+```
+
+### Ensure both objects are in the same coordinate reference system (CRS)
+
+```{r}
+
+# update pig GPS locations to match the CRS of the shooting locations
+pig_all_steps_sf <- st_transform(pig_all_steps_sf, st_crs(filtered_shooting_locations))
+st_crs(pig_all_steps_sf)$input
+
+```
+
+## Save the filtered shooting locations as a csv
+
+```{r}
+
+filtered_shooting_locations %>%
+  mutate(
+    x = st_coordinates(.)[, "X"],
+    y = st_coordinates(.)[, "Y"]
+  ) %>%
+  st_drop_geometry() %>%
+  write_csv("data/filtered_shooting_locations_3112.csv")
+
+```
+
+## Use leaflet to plot the data
+
+Here we create a plot that can animate the pig GPS locations through time, and show the shooting events as red dots that fade out over a few hours. This helps to visualise the overlap between the pig GPS locations and the shooting events, and to see if there are any obvious changes in pig behaviour after shooting events.
+
+```{r}
+#| label: leaflet-map
+#| message: false
+#| warning: false
+
+# convert to an sf object (x1_/y1_ are in GDA94 / GA Lambert, EPSG:3112)
+# and reproject to WGS84 (EPSG:4326) for leaflet
+pig_all_steps_sf_wgs84 <- pig_all_steps_sf %>%
+  st_transform(crs = 4326)
+
+pal <- colorFactor(viridisLite::viridis(n_distinct(pig_all_steps_sf$name), option = "H"),
+                    domain = pig_all_steps_sf$name)
+
+# addCircleMarkers() draws one SVG element per point, and there are ~246k of
+# them, which locks up the browser (and the VS Code webview in particular).
+# Thin the points for display and draw them with WebGL via leafgl instead.
+pig_map_pts <- pig_all_steps_sf_wgs84 %>%
+  group_by(name) %>%
+  slice(seq(1, n(), by = 1)) %>% # every ith fix per pig
+  ungroup()
+
+# Break each pig's track wherever the gap between fixes is longer than this,
+# so the lines don't jump across periods with no data
+max_gap_hours <- 3
+
+pig_map_pts <- pig_map_pts %>%
+  arrange(name, t1_) %>%
+  group_by(name) %>%
+  mutate(new_seg = is.na(lag(t1_)) |
+           difftime(t1_, lag(t1_), units = "hours") > max_gap_hours,
+         seg = cumsum(new_seg)) %>%
+  ungroup()
+
+# one line per pig per continuous run of fixes
+pig_map_lines <- pig_map_pts %>%
+  group_by(name, seg) %>%
+  filter(n() > 1) %>%
+  summarise(do_union = FALSE, .groups = "drop") %>%
+  st_cast("LINESTRING")
+
+# Data for the time slider, sorted by time. Coordinates are stored as integers
+# (degrees * 1e5, ~1 m) and times as seconds since the first fix, which keeps
+# the JSON embedded in the html much smaller
+pig_levels <- sort(unique(pig_map_pts$name))
+t0 <- min(pig_map_pts$t1_)
+pig_time <- pig_map_pts %>% arrange(t1_)
+pig_time_xy <- st_coordinates(pig_time)
+
+# Shooting events for the time slider: each appears as a large red dot at its
+# shoot_time and fades out over shoot_fade_hours
+shoot_fade_hours <- 6
+shoot_pts <- filtered_shooting_locations %>%
+  filter(!is.na(shoot_time)) %>%
+  st_transform(crs = 4326)
+shoot_xy <- st_coordinates(shoot_pts)
+
+pig_time_data <- list(
+  lng = as.integer(round(pig_time_xy[, "X"] * 1e5)),
+  lat = as.integer(round(pig_time_xy[, "Y"] * 1e5)),
+  t = as.integer(round(as.numeric(difftime(pig_time$t1_, t0, units = "secs")))),
+  pig = match(pig_time$name, pig_levels) - 1L,
+  brk = as.integer(pig_time$new_seg),
+  pigs = pig_levels,
+  cols = pal(pig_levels),
+  t0 = as.numeric(t0),
+  step = 30 * 60, # slider step (s), matching the 30 min fix rate
+  max_gap = max_gap_hours * 3600,
+  shoot = list(
+    lng = as.integer(round(shoot_xy[, "X"] * 1e5)),
+    lat = as.integer(round(shoot_xy[, "Y"] * 1e5)),
+    t = as.integer(round(as.numeric(difftime(shoot_pts$shoot_time, t0, units = "secs")))),
+    fade = shoot_fade_hours * 3600
+  )
+)
+
+# The time slider is a custom canvas layer (the leaftime package draws every
+# feature as SVG, which has the same problem as addCircleMarkers). Each redraw
+# only draws the fixes inside the current time window: the trail of each pig
+# as a line plus small points, and its latest fix as a large point (only if
+# that fix is within max_gap_hours of the slider time).
+pig_time_js <- r"--[
+function(el, x, d) {
+  var map = this;
+  var n = d.t.length, npig = d.pigs.length, STEP = d.step;
+  var t = d.t, pig = d.pig, brk = d.brk;
+  var lat = new Float64Array(n), lng = new Float64Array(n);
+  for (var i = 0; i < n; i++) { lat[i] = d.lat[i] / 1e5; lng[i] = d.lng[i] / 1e5; }
+  // htmlwidgets unboxes length-1 vectors, so wrap the shooting columns back
+  // into arrays in case there is only one shoot
+  var sh = { lat: [].concat(d.shoot.lat), lng: [].concat(d.shoot.lng),
+             t: [].concat(d.shoot.t), fade: d.shoot.fade };
+  var tMax = Math.ceil(Math.max(t[n - 1], Math.max.apply(null, sh.t)) / STEP) * STEP;
+  var state = { cur: 86400, win: 86400, timer: null };
+
+  // first index with t >= v
+  function lowerBound(v) {
+    var a = 0, b = n;
+    while (a < b) { var m = (a + b) >> 1; if (t[m] < v) a = m + 1; else b = m; }
+    return a;
+  }
+
+  function fmt(s) {
+    return new Date((d.t0 + s) * 1000).toLocaleString('en-AU', {
+      timeZone: 'Australia/Darwin', day: '2-digit', month: 'short',
+      year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  var TimeLayer = L.Layer.extend({
+    onAdd: function(m) {
+      this._canvas = L.DomUtil.create('canvas', 'leaflet-zoom-hide');
+      this._canvas.style.pointerEvents = 'none';
+      m.getPanes().overlayPane.appendChild(this._canvas);
+      m.on('moveend resize', this._reset, this);
+      this._reset();
+    },
+    onRemove: function(m) {
+      L.DomUtil.remove(this._canvas);
+      m.off('moveend resize', this._reset, this);
+    },
+    _reset: function() {
+      var size = map.getSize(), r = window.devicePixelRatio || 1, c = this._canvas;
+      L.DomUtil.setPosition(c, map.containerPointToLayerPoint([0, 0]));
+      c.width = size.x * r; c.height = size.y * r;
+      c.style.width = size.x + 'px'; c.style.height = size.y + 'px';
+      this.redraw();
+    },
+    redraw: function() {
+      var c = this._canvas, ctx = c.getContext('2d'), r = window.devicePixelRatio || 1;
+      ctx.setTransform(r, 0, 0, r, 0, 0);
+      ctx.clearRect(0, 0, c.width / r, c.height / r);
+
+      var lo = lowerBound(state.cur - state.win), hi = lowerBound(state.cur + 1);
+      var px = new Float32Array(hi - lo), py = new Float32Array(hi - lo);
+      var byPig = [], i, j, k, q, idx;
+      for (k = 0; k < npig; k++) byPig.push([]);
+      for (i = lo; i < hi; i++) {
+        var p = map.latLngToContainerPoint([lat[i], lng[i]]);
+        px[i - lo] = p.x; py[i - lo] = p.y;
+        byPig[pig[i]].push(i);
+      }
+
+      ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+      for (k = 0; k < npig; k++) {
+        idx = byPig[k];
+        if (!idx.length) continue;
+        ctx.strokeStyle = d.cols[k]; ctx.fillStyle = d.cols[k];
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        for (j = 0; j < idx.length; j++) {
+          q = idx[j] - lo;
+          if (j === 0 || brk[idx[j]]) ctx.moveTo(px[q], py[q]); else ctx.lineTo(px[q], py[q]);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        for (j = 0; j < idx.length; j++) {
+          q = idx[j] - lo;
+          ctx.moveTo(px[q] + 2.5, py[q]); ctx.arc(px[q], py[q], 2.5, 0, 2 * Math.PI);
+        }
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.strokeStyle = '#fff';
+      for (k = 0; k < npig; k++) {
+        idx = byPig[k];
+        if (!idx.length) continue;
+        i = idx[idx.length - 1];
+        if (state.cur - t[i] > d.max_gap) continue;
+        q = i - lo;
+        ctx.fillStyle = d.cols[k];
+        ctx.beginPath(); ctx.arc(px[q], py[q], 6, 0, 2 * Math.PI);
+        ctx.fill(); ctx.stroke();
+      }
+
+      // shooting events: full opacity at shoot_time, fading linearly to zero
+      // over sh.fade seconds
+      ctx.fillStyle = '#e60000';
+      for (i = 0; i < sh.t.length; i++) {
+        var age = state.cur - sh.t[i];
+        if (age < 0 || age > sh.fade) continue;
+        var s = map.latLngToContainerPoint([sh.lat[i] / 1e5, sh.lng[i] / 1e5]);
+        ctx.globalAlpha = 1 - age / sh.fade;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 10, 0, 2 * Math.PI);
+        ctx.fill(); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+  });
+
+  var layer = new TimeLayer().addTo(map);
+
+  var ctrl = L.control({ position: 'bottomleft' });
+  ctrl.onAdd = function() {
+    var div = L.DomUtil.create('div', 'leaflet-bar');
+    div.style.cssText = 'background:#fff;padding:6px 10px;font:12px/1.5 sans-serif;';
+    div.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px">' +
+        '<button type="button" class="pt-play" style="width:30px">&#9654;</button>' +
+        '<button type="button" class="pt-back" title="Back 30 min">&#8249;</button>' +
+        '<div style="width:420px">' +
+          '<input type="range" class="pt-slider" min="0" max="' + tMax + '" step="' + STEP +
+            '" value="' + state.cur + '" style="width:100%;margin:0;display:block">' +
+          // strip of shooting ticks under the slider; the side margins
+          // roughly match the inset of the slider thumb's travel
+          '<div class="pt-shoots" title="Click to jump to the nearest shooting event"' +
+            ' style="position:relative;height:9px;margin:1px 8px 0;cursor:pointer"></div>' +
+        '</div>' +
+        '<button type="button" class="pt-fwd" title="Forward 30 min">&#8250;</button>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-top:4px">' +
+        '<span class="pt-label" style="min-width:290px"></span>' +
+        'Trail <select class="pt-win">' +
+          '<option value="21600">6 hours</option>' +
+          '<option value="86400" selected>1 day</option>' +
+          '<option value="259200">3 days</option>' +
+          '<option value="604800">1 week</option>' +
+          '<option value="2592000">30 days</option>' +
+          '<option value="Infinity">All to date</option>' +
+        '</select>' +
+        'Speed <select class="pt-speed">' +
+          '<option value="1800">30 min/s</option>' +
+          '<option value="3600">1 hour/s</option>' +
+          '<option value="10800">3 hours/s</option>' +
+          '<option value="21600">6 hours/s</option>' +
+          '<option value="43200">12 hours/s</option>' +
+          '<option value="86400" selected>1 day/s</option>' +
+          '<option value="259200">3 days/s</option>' +
+          '<option value="604800">1 week/s</option>' +
+        '</select>' +
+      '</div>';
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.disableScrollPropagation(div);
+    return div;
+  };
+  ctrl.addTo(map);
+
+  var div = ctrl.getContainer();
+  var slider = div.querySelector('.pt-slider'), label = div.querySelector('.pt-label');
+  var playBtn = div.querySelector('.pt-play'), win = div.querySelector('.pt-win');
+  var speed = div.querySelector('.pt-speed');
+
+  function update() {
+    slider.value = state.cur;
+    label.textContent = fmt(Math.max(0, state.cur - state.win)) + '  –  ' + fmt(state.cur);
+    layer.redraw();
+  }
+  function stop() {
+    clearInterval(state.timer); state.timer = null; playBtn.innerHTML = '&#9654;';
+  }
+
+  // Playback speed is in seconds of data per real second. Each tick advances a
+  // whole number of slider steps, with at most 10 ticks per second, so slow
+  // speeds tick less often rather than moving by part of a step
+  function start() {
+    var rate = Number(speed.value);
+    var k = Math.max(1, Math.round(rate / 10 / STEP));
+    state.timer = setInterval(function() {
+      state.cur = Math.min(state.cur + k * STEP, tMax);
+      update();
+      if (state.cur >= tMax) stop();
+    }, 1000 * k * STEP / rate);
+  }
+  function stepBy(nSteps) {
+    state.cur = Math.min(Math.max(state.cur + nSteps * STEP, 0), tMax);
+    update();
+  }
+
+  // One red tick per slider step that has a shooting event in it. Clicking
+  // the strip jumps to the nearest event, rounded up to the slider step so
+  // the shooting dot is drawn at full opacity
+  var shootBar = div.querySelector('.pt-shoots');
+  var shootSteps = sh.t.map(function(s) {
+    return Math.min(Math.max(Math.ceil(s / STEP) * STEP, 0), tMax);
+  }).filter(function(s, i, a) { return a.indexOf(s) === i; })
+    .sort(function(a, b) { return a - b; });
+  shootSteps.forEach(function(s) {
+    var tick = document.createElement('div');
+    tick.style.cssText = 'position:absolute;top:0;width:2px;height:9px;margin-left:-1px;' +
+      'background:#e60000;pointer-events:none;left:' + (100 * s / tMax) + '%';
+    shootBar.appendChild(tick);
+  });
+  shootBar.addEventListener('click', function(e) {
+    if (!shootSteps.length) return;
+    var box = shootBar.getBoundingClientRect();
+    var tClick = (e.clientX - box.left) / box.width * tMax;
+    var best = shootSteps[0];
+    shootSteps.forEach(function(s) {
+      if (Math.abs(s - tClick) < Math.abs(best - tClick)) best = s;
+    });
+    stop();
+    state.cur = best;
+    update();
+  });
+
+  slider.addEventListener('input', function() { state.cur = +slider.value; update(); });
+  win.addEventListener('change', function() { state.win = Number(win.value); update(); });
+  speed.addEventListener('change', function() {
+    if (state.timer) { clearInterval(state.timer); start(); }
+  });
+  div.querySelector('.pt-back').addEventListener('click', function() { stepBy(-1); });
+  div.querySelector('.pt-fwd').addEventListener('click', function() { stepBy(1); });
+  playBtn.addEventListener('click', function() {
+    if (state.timer) { stop(); return; }
+    if (state.cur >= tMax) state.cur = 0;
+    playBtn.innerHTML = '&#10074;&#10074;';
+    start();
+  });
+
+  update();
+}
+]--"
+
+pig_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles(providers$Esri.WorldImagery) %>%
+  leafgl::addGlPolylines(data = pig_map_lines,
+                         color = pal(pig_map_lines$name),
+                         opacity = 0.6,
+                         weight = 1.5,
+                         group = "All tracks") %>%
+  leafgl::addGlPoints(data = pig_map_pts,
+                      fillColor = pal(pig_map_pts$name),
+                      fillOpacity = 0.75,
+                      radius = 5,
+                      popup = paste0("ID: ", pig_map_pts$name,
+                                     "<br>Time: ", pig_map_pts$t1_),
+                      group = "All fixes") %>%
+  addLegend(position = "bottomright", pal = pal,
+            values = pig_map_pts$name, title = "Pig ID") %>%
+  addScaleBar(position = "bottomleft",
+              options = scaleBarOptions(imperial = FALSE)) %>%
+  addLegend(position = "bottomright", colors = "#e60000",
+            labels = paste0("Shooting (fades over ", shoot_fade_hours, " h)")) %>%
+  # the full tracks and fixes are off by default so the time slider layer is
+  # readable; tick them on in the layers control
+  addLayersControl(overlayGroups = c("All tracks", "All fixes"),
+                   options = layersControlOptions(collapsed = FALSE)) %>%
+  hideGroup(c("All tracks", "All fixes")) %>%
+  htmlwidgets::onRender(pig_time_js, data = pig_time_data)
+
+# The VS Code htmlwidget viewer struggles with large maps, so when working
+# interactively write the map out and open it in the system browser. When the
+# document is rendered, the widget is printed inline as usual.
+if (interactive()) {
+  map_file <- file.path("outputs", "pig_map.html") #tempdir()
+  # selfcontained = FALSE writes a sibling _files/ folder, which avoids needing
+  # pandoc on the path and is much faster to write for a map this size
+  htmlwidgets::saveWidget(pig_map, map_file, selfcontained = TRUE)
+  utils::browseURL(map_file)
+} else {
+  pig_map
+}
+
+```
+
+## Distance in time and space of pig GPS locations to shooting events
+
+```{r}
+
+# find all pig/shooting pairs within x m (returns a list of indices)
+# this is irrespective of time at this point
+idx <- st_is_within_distance(pig_all_steps_sf, filtered_shooting_locations, dist = 500)
+
+# turn that into a table of matched pairs
+# this means that this pig GPS location is within x m of this shooting location
+pairs <- tibble(
+  pig_row   = rep(seq_along(idx), lengths(idx)),
+  shoot_row = unlist(idx)
+)
+
+# distance between pig GPS points and shooting locations in metres
+pairs$dist_m <- as.numeric(
+  st_distance(pig_all_steps_sf[pairs$pig_row, ],
+              filtered_shooting_locations[pairs$shoot_row, ],
+              by_element = TRUE)
+)
+
+# attach the attributes from both objects
+hits <- bind_cols(
+  # keep only the GPS locations that are within x m of a shooting location
+  pig_all_steps_sf[pairs$pig_row, ],
+  filtered_shooting_locations[pairs$shoot_row, ] %>% st_drop_geometry(), #%>% rename_with(~ paste0("shoot_", .x)),
+  dist_m = pairs$dist_m
+)
+
+# keep only the GPS locations that are within 3 hours of a shooting event
+# also add the time difference between the pig GPS location and the shooting event (in hours)
+# negative values are before the shooting event, positive values are after 
+hits <- hits %>% 
+  filter(t1_ >= shoot_time - hours(3),
+         t1_ <= shoot_time + hours(3)) %>% 
+  mutate(
+    shoot_time_diff = as.numeric(difftime(t1_, shoot_time, units = "hours")),
+  ) 
+
+```
+
+### Keep only the nearest in time
+
+For each shooting location and each pig, take the pig GPS location that is nearest in time to the shooting event.
+
+For instance, within 3 hours either side of the shooting times, we have 182 instances where a pig was within 2000 m of a shooting event. What we have left in this dataframe is the 'focal shooting location', meaning it was nearest in time to the shooting event for that pig. 
+
+Using the focal shooting location, we will extract a sequence of locations from before and after the shooting event, to see if there is a change in behaviour.
+
+```{r}
+  
+hits_nearest_time <- hits %>% 
+  group_by(name, shoot_id) %>% 
+  slice_min(abs(shoot_time_diff), n = 1)  %>% 
+  ungroup()
+
+hits_nearest_time
+
+# there are four periods with a couple days of shooting
+ggplot(hits_nearest_time, aes(x = shoot_time)) +
+  geom_histogram(bins = 30, fill = "red", colour = "black") +
+  scale_x_datetime("Time difference between pig GPS location and shooting event (hours)") +
+  theme_bw()
+
+```
+
+### Extract pig GPS locations either side of the focal shoot location
+
+```{r}
+
+shoot_focal_window <- 24 # time either side of focal shooting location (in hours)
+
+# one row per pig/shooting instance, with the temporal window to filter the data by
+focal <- hits_nearest_time %>%
+  st_drop_geometry() %>%
+  distinct(name, shoot_id, shoot_time) %>%
+  mutate(win_start = shoot_time - hours(shoot_focal_window),
+         win_end   = shoot_time + hours(shoot_focal_window))
+
+head(focal, 10)
+
+```
+
+### Just use the first matching shoot of each day
+
+Often, there are multiple shooting locations on the same day - we will therefore only look at the first shooting event for each pig on that day, and the GPS locations either side of that event.
+
+```{r}
+
+focal_daily <- focal %>% 
+  mutate(
+    shoot_date = lubridate::as_date(shoot_time)
+  ) %>% 
+  group_by(name, shoot_date) %>% 
+  slice_min(shoot_time, n = 1)  %>% 
+  ungroup()
+
+# each row represents one of the pigs that was within 3 hours and 1 km of a shooting event
+focal_daily
+
+```
+
+### Pull out the shooting locations and match to the pig GPS locations
+
+```{r}
+
+# shooting locations, one row per shoot_id
+shoot_geom <- filtered_shooting_locations %>%
+  select(shoot_id)
+
+# distance (m) from each fix to the pig's own GPS fix nearest in time to the shoot
+# (i.e. where the pig was at t = 0), so every sequence starts from 0 at the shoot.
+# Staying near 0 after the shoot suggests bunkering down, rapid increases suggest fleeing
+add_dist_to_t0 <- function(seqs) {
+  seqs %>%
+    group_by(seq_id) %>%
+    mutate(
+      dist_to_t0_m = as.numeric(
+        st_distance(geometry, geometry[which.min(abs(time_diff_hrs))]))
+    ) %>%
+    ungroup()
+}
+
+# pull every GPS fix for that pig inside the window
+shooting_sequences_daily <- pig_all_steps_sf %>%
+  inner_join(focal_daily,
+             by = join_by(name, between(t1_, win_start, win_end)),
+             relationship = "many-to-many")
+
+# distance (m) from each fix to its own focal shooting location
+shooting_sequences_daily <- shooting_sequences_daily %>%
+  mutate(
+    dist_to_shoot_m = as.numeric(
+      st_distance(geometry,
+                  shoot_geom$geometry[match(shoot_id, shoot_geom$shoot_id)],
+                  by_element = TRUE)),
+    time_diff_hrs = as.numeric(difftime(t1_, shoot_time, units = "hours")),
+    time_diff_hrs_m6 = time_diff_hrs + 6, # to normalise distances at the location 6 hours before
+    period = if_else(time_diff_hrs < 0, "baseline", "response"),
+    seq_id = paste(name, shoot_id, sep = "_")
+  ) %>%
+  arrange(seq_id, t1_) %>%
+  add_dist_to_t0()
+
+head(shooting_sequences_daily, 10) # printing every row bloats the rendered html
+
+```
+
+# Pig responses to shooting events
+
+## Distance to the shooting location
+
+Here we are looking at the distance of the pig GPS locations to the shooting location, relative to the time of the shooting event. The red dashed line is the time of the shooting event. Larger values mean they are further away, meaning that increasing values show that they are moving away from where the shooting happened. 
+
+```{r}
+
+shooting_sequences_daily %>%        
+  ggplot(aes(x = time_diff_hrs, y = dist_to_shoot_m, colour = seq_id)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  geom_path(alpha = 0.5) +
+  scale_y_continuous("Distance to the shooting location (m)") +
+  labs(title = "Observed shooting events") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+## Distance from the pig's location at the time of shooting
+
+Here the distance is measured from each pig's own GPS location nearest in time to the shooting event, so every sequence is 0 at t = 0. Values that stay near 0 after the shoot suggest the pig bunkered down, and values that increase rapidly suggest it fled.
+
+```{r}
+
+shooting_sequences_daily %>%
+  ggplot(aes(x = time_diff_hrs, y = dist_to_t0_m, colour = seq_id)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  geom_path(alpha = 0.5) +
+  scale_y_continuous("Distance from location at time of shooting (m)") +
+  labs(title = "Observed shooting events") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+## Distance between GPS locations
+
+We call the distance between successive GPS locations the 'step length' (sl). Here we are looking at the step lengths of the pig GPS locations relative to the time of the shooting event. The red dashed line is the time of the shooting event. Larger values mean they are moving faster.
+
+The GPS locations were set to record locations every half an hour, so the step lengths are (typically, sometimes there are missing fixes) the distance between locations every half an hour.
+
+```{r}
+
+bin_width <- 0.5  # hours
+
+bin_means <- shooting_sequences_daily %>%
+  mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
+  group_by(bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+shooting_sequences_daily %>% #filter(name == "Dora the Explorer") %>%
+  ggplot(aes(x = time_diff_hrs, y = sl_, colour = seq_id)) +
+  geom_path(alpha = 0.25) +
+  
+  # mean with error bar
+  # geom_errorbar(data = bin_means, inherit.aes = FALSE,
+  #               aes(x = bin, ymin = mean_sl - se, ymax = mean_sl + se),
+  #               width = bin_width * 0.3) +
+  # geom_line(data = bin_means, inherit.aes = FALSE,
+  #           aes(x = bin, y = mean_sl), colour = "black") +
+  # geom_point(data = bin_means, inherit.aes = FALSE,
+  #            aes(x = bin, y = mean_sl), colour = "black", size = 2) +
+  
+  # median and quartiles
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q25), colour = "black", linetype = "dashed") +
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q50), colour = "black") +
+  geom_line(data = bin_means, inherit.aes = FALSE,
+            aes(x = bin, y = q75), colour = "black", linetype = "dashed") +
+  geom_point(data = bin_means, inherit.aes = FALSE,
+             aes(x = bin, y = q50), colour = "black", size = 2) +
+  
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  scale_y_continuous("Step length (m)") +
+  scale_x_continuous("GPS time relative to shooting event (hours)", 
+                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+  coord_cartesian(ylim = c(0, 750)) +
+  scale_colour_viridis_d() +
+  labs(title = "Observed shooting events") +
+  theme_bw() +
+  theme(legend.position = "none") 
+
+# hist(lubridate::hour(shooting_sequences_daily$shoot_time))
+
+```
+
+# Create control sets of responses
+
+## 5 days before each shooting operation
+
+Given the fairly consistent time of shooting operations (in the morning), we don't know whether the behavioural patterns that we are observing are due to the shooting or just their typical behaviour for those times of day.
+
+For this, we will generate a control for comparison. Given that each of the shooting events covered a couple days, we will take sequences of locations from the pigs that were exposed to shooting, at the same time of day as each of the shooting events, but 5 days before the actual shooting events.
+
+We run essentially the same code, but just subtract 5 days from the sequences that we use to extract locations.
+
+```{r}
+
+pseudo_interval <- lubridate::days(5)
+
+# One row per focal pig/shooting event, with the temporal window
+focal_pseudo <- hits_nearest_time %>%
+  st_drop_geometry() %>%
+  distinct(name, shoot_id, shoot_time) %>%
+  mutate(
+    shoot_time = shoot_time - pseudo_interval,
+    win_start = shoot_time - hours(shoot_focal_window),
+    win_end   = shoot_time + hours(shoot_focal_window)
+    )
+
+# Shooting locations, same CRS as the pigs, one row per shoot_id
+shoot_geom <- filtered_shooting_locations %>%
+  select(shoot_id)
+
+# Pull every GPS fix for that pig inside the window
+seqs_pseudo <- pig_all_steps_sf %>% 
+  inner_join(focal_pseudo,
+             by = join_by(name, between(t1_, win_start, win_end)),
+             relationship = "many-to-many")
+
+# Distance (m) from each fix to its own focal shooting location
+seqs_pseudo <- seqs_pseudo %>%
+  mutate(
+    dist_to_shoot_m = as.numeric(
+      st_distance(geometry,
+                  shoot_geom$geometry[match(shoot_id, shoot_geom$shoot_id)],
+                  by_element = TRUE)),
+    time_diff_hrs = as.numeric(difftime(t1_, shoot_time, units = "hours")),
+    time_diff_hrs_m6 = time_diff_hrs + 6, # to normalise distances at the location 6 hours before
+    period = if_else(time_diff_hrs < 0, "baseline", "response"),
+    seq_id = paste(name, shoot_id, sep = "_")
+  ) %>%
+  arrange(seq_id, t1_) %>%
+  add_dist_to_t0()
+
+head(seqs_pseudo, 10)
+
+```
+
+### Just use the first matching shoot of each day
+
+There are multiple shooting locations on the same day - we will therefore only look at the first shooting event for each pig on that day, and the GPS locations either side of that event.
+
+```{r}
+
+shooting_sequences_daily_pseudo <- seqs_pseudo %>% 
+  mutate(
+    shoot_date = lubridate::as_date(shoot_time)
+  ) %>% 
+  group_by(name, shoot_date) %>% 
+  slice_min(shoot_time, n = 1)  %>% 
+  ungroup()
+
+head(shooting_sequences_daily_pseudo, 10)
+
+```
+
+## Plotting shooting info
+
+```{r}
+
+shooting_sequences_daily_pseudo %>%        
+  ggplot(aes(x = time_diff_hrs, y = dist_to_shoot_m, colour = seq_id)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  geom_path(alpha = 0.5) +
+  scale_y_continuous("Distance to the shooting location (m)") +
+  # coord_cartesian(ylim = c(0, 4000)) +
+  labs(title = "5 days before the shooting events") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+shooting_sequences_daily_pseudo %>%
+  ggplot(aes(x = time_diff_hrs, y = dist_to_t0_m, colour = seq_id)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  geom_path(alpha = 0.5) +
+  scale_y_continuous("Distance from location at time of shooting (m)") +
+  labs(title = "5 days before the shooting events") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+### Step lengths for baseline/response
+
+```{r}
+
+bin_width <- 0.5  # hours
+
+bin_means_psuedo <- shooting_sequences_daily_pseudo %>%
+  mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
+  group_by(bin) %>%
+  summarise(
+    mean_sl = mean(sl_, na.rm = TRUE),
+    se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+    q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+    q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+    q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+    n       = sum(!is.na(sl_)),
+    .groups = "drop"
+  )
+
+shooting_sequences_daily_pseudo %>% #filter(name == "Dora the Explorer") %>%
+  ggplot(aes(x = time_diff_hrs, y = sl_, colour = seq_id)) +
+  geom_path(alpha = 0.25) +
+  
+  # median and quartiles
+  geom_line(data = bin_means_psuedo, inherit.aes = FALSE,
+            aes(x = bin, y = q25), colour = "black", linetype = "dashed") +
+  geom_line(data = bin_means_psuedo, inherit.aes = FALSE,
+            aes(x = bin, y = q50), colour = "black") +
+  geom_line(data = bin_means_psuedo, inherit.aes = FALSE,
+            aes(x = bin, y = q75), colour = "black", linetype = "dashed") +
+  geom_point(data = bin_means_psuedo, inherit.aes = FALSE,
+             aes(x = bin, y = q50), colour = "black", size = 2) +
+  
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  scale_y_continuous("Step length (m)") +
+  scale_x_continuous("GPS time relative to shooting event (hours)", 
+                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+  coord_cartesian(ylim = c(0, 750)) +
+  scale_colour_viridis_d() +
+  labs(title = "5 days before the shooting events") +
+  theme_bw() +
+  theme(legend.position = "none") 
+
+```
+
+# Compare the observed and control responses together
+
+## Combine the data frames
+
+```{r}
+
+shooting_sequences_daily_all <- shooting_sequences_daily %>% 
+  mutate(type = "Observed") %>% 
+  bind_rows(shooting_sequences_daily_pseudo %>% mutate(type = "Pseudo"))
+
+# setting the colours for the shooting
+shoot_cols <- c("Observed" = "#D55E00",   # vermillion
+                "Pseudo"   = "#009E73")   # bluish green
+
+shoot_labels <- c("Observed" = "Observed shoots",
+                  "Pseudo"   = "5 days before")
+
+```
+
+## Distance from the location at the time of shooting
+
+Median (line) and interquartile range (ribbon) of the distance from each pig's location at the time of shooting. A curve that stays flat near 0 after the shoot indicates bunkering down, and a steeper rise for the observed shoots than for the controls indicates fleeing.
+
+```{r}
+#| results: asis
+
+bin_width <- 0.5  # hours
+
+# date windows of each shooting operation (same as the step length plots below)
+shoot_operations <- tribble(
+  ~op,                                      ~file_suffix, ~window_min,           ~window_max,
+  "All shooting operations",                "all",        as_date("2025 01 01"), as_date("2027 01 01"),
+  "First shoot (early Nov 2025)",           "first",      as_date("2025 11 01"), as_date("2025 11 10"),
+  "Second shoot (late Nov/early Dec 2025)", "second",     as_date("2025 11 20"), as_date("2025 12 14"),
+  "Third shoot (May 2026)",                 "third",      as_date("2026 05 12"), as_date("2026 05 30"),
+  "Fourth shoot (Aug 2026)",                "fourth",     as_date("2026 08 12"), as_date("2026 08 30")
+)
+
+cat("::: {.panel-tabset}\n\n")
+
+for (i in seq_len(nrow(shoot_operations))) {
+
+  op_i <- shoot_operations[i, ]
+
+  dist_t0_bins <- shooting_sequences_daily_all %>%
+    st_drop_geometry() %>%
+    filter(shoot_time > op_i$window_min & shoot_time < op_i$window_max) %>%
+    mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
+    group_by(type, bin) %>%
+    summarise(
+      mean_dist = mean(dist_to_t0_m, na.rm = TRUE),
+      q025 = quantile(dist_to_t0_m, probs = 0.025, na.rm = TRUE),
+      q25 = quantile(dist_to_t0_m, probs = 0.25, na.rm = TRUE),
+      q50 = quantile(dist_to_t0_m, probs = 0.5, na.rm = TRUE),
+      q75 = quantile(dist_to_t0_m, probs = 0.75, na.rm = TRUE),
+      q975 = quantile(dist_to_t0_m, probs = 0.975, na.rm = TRUE),
+      n   = sum(!is.na(dist_to_t0_m)),
+      .groups = "drop"
+    )
+
+  p <- dist_t0_bins %>%
+    ggplot(aes(x = bin)) +
+    
+    # 95% confidence interval as a ribbon
+    geom_ribbon(aes(ymin = q025, ymax = q975, fill = type, colour = type),
+                alpha = 0.15, 
+                # linetype = "dashed",
+                linewidth = 0.15) +
+    # 50% interquartile range as a ribbon
+    geom_ribbon(aes(ymin = q25, ymax = q75, fill = type, colour = type),
+                alpha = 0.25,  
+                linewidth = 0.25) +
+    
+    geom_line(aes(y = mean_dist, colour = type)) +
+    geom_point(aes(y = mean_dist, colour = type), size = 1) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+    scale_y_continuous("Distance (m)") +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    scale_colour_manual(name = "", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "", values = shoot_cols, labels = shoot_labels) +
+    # coord_cartesian(ylim = c(0, 3500)) +
+    labs(subtitle = "Distance from GPS location at time of shooting",
+         # subtitle = op_i$op
+         ) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(paste0(outputs_dir, "dist_to_t0_shooting_vs_pseudo_", op_i$file_suffix, ".png"),
+         plot = p, width = 150, height = 90, units = "mm", scale = 1, dpi = 600)
+
+  # one tab per shooting operation: heading first, then the plot
+  cat("\n\n### ", op_i$op, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+## Step lengths for baseline/response - filtering by shooting operation
+
+```{r}
+#| results: asis
+
+cat("::: {.panel-tabset}\n\n")
+
+for (i in seq_len(nrow(shoot_operations))) {
+  
+  op_i <- shoot_operations[i, ]
+  
+  bin_means_both <- shooting_sequences_daily_all %>%
+    st_drop_geometry() %>%
+    filter(shoot_time > op_i$window_min & shoot_time < op_i$window_max) %>%
+    mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
+    group_by(type, bin) %>%
+    summarise(
+      mean_sl = mean(sl_, na.rm = TRUE),
+      se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+      q025    = quantile(sl_, probs = 0.025, na.rm = TRUE),
+      q975    = quantile(sl_, probs = 0.975, na.rm = TRUE),
+      q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+      q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+      q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+      n       = sum(!is.na(sl_)),
+      .groups = "drop"
+    )
+
+  p <- bin_means_both %>%
+    ggplot(aes(x = bin)) +
+    
+    # 95% confidence interval as a ribbon
+    geom_ribbon(aes(ymin = q025, ymax = q975, fill = type, colour = type),
+                alpha = 0.15, 
+                # linetype = "dashed",
+                linewidth = 0.15) +
+    # 50% interquartile range as a ribbon
+    geom_ribbon(aes(ymin = q25, ymax = q75, fill = type, colour = type),
+                alpha = 0.25, 
+                linewidth = 0.25) +
+    
+    geom_line(aes(y = mean_sl, colour = type)) +
+    geom_point(aes(y = mean_sl, colour = type), size = 1) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+    scale_y_continuous("Step length (m)") +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    scale_colour_manual(name = "", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "", values = shoot_cols, labels = shoot_labels) +
+    coord_cartesian(ylim = c(0, 500)) +
+    labs(subtitle = "Step lengths",
+         # subtitle = op_i$op
+         ) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(paste0(outputs_dir, "step_length_shooting_vs_pseudo_", op_i$file_suffix, ".png"),
+         plot = p, width = 150, height = 90, units = "mm", scale = 1, dpi = 600)
+
+  # one tab per shooting operation: heading first, then the plot
+  cat("\n\n### ", op_i$op, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+# Vegetation responses
+
+Here we are looking at whether the pigs changed the habitat that they were in either side of the shooting events. I.e. did they switch from a more open habitat to a more closed habitat for shelter/safety.
+
+### Define colours for the vegetation classes
+
+```{r}
+
+veg_colours <- c(
+  "Dry Rainforest"          = "#1B5E3A",  # dark green
+  "Eucalypt Open Forest"    = "#B5772B",  # deep ochre
+  "Eucalypt Woodland"       = "#E0B65C",  # light ochre
+  "Floodplain Sedgeland"    = "#D6E2A3",  # pale yellow-green
+  "Melaleuca Woodland"      = "#A9CCE3",  # light blue
+  "Melaleuca Open Forest"   = "#5B97BF",  # mid blue
+  "Melaleuca Closed Forest" = "#2B5F8A",  # dark blue
+  "Mangrove"                = "#2A9D8F",  # teal
+  "Mudflat"                 = "#8A7968",  # grey-brown
+  "Water"                   = "#264653"   # dark blue-gray"
+)
+
+```
+
+### Proportions of vegetation classes either side of the shooting events
+
+```{r}
+#| results: asis
+#| fig-width: 7
+#| fig-height: 8
+
+bin_width <- 0.5  # hours
+
+cat("::: {.panel-tabset}\n\n")
+
+for (i in seq_len(nrow(shoot_operations))) {
+
+  op_i <- shoot_operations[i, ]
+
+  # proportion of each class per time bin, separately for the observed and control sequences
+  veg_props_shoot <- shooting_sequences_daily_all %>%
+    st_drop_geometry() %>%
+    filter(shoot_time > op_i$window_min & shoot_time < op_i$window_max,
+           !is.na(Veg_class)) %>%
+    mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2) %>%
+    count(type, bin, Veg_class) %>%
+    # fill classes that weren't used in a bin with zeros so the areas stack properly
+    complete(type, bin, Veg_class, fill = list(n = 0)) %>%
+    group_by(type, bin) %>%
+    mutate(prop = n / sum(n)) %>%
+    ungroup() %>%
+    filter(!is.nan(prop)) %>%
+    mutate(type = factor(type, levels = names(shoot_labels), labels = shoot_labels),
+           Veg_class = factor(Veg_class, levels = names(veg_colours)))
+
+  p <- veg_props_shoot %>%
+    ggplot(aes(x = bin, y = prop, fill = Veg_class)) +
+    geom_area(colour = "white", linewidth = 0.2) +
+
+    # add a line for the time of the shooting event
+    geom_vline(xintercept = 0, colour = "black", linetype = "dashed") +
+
+    scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3),
+                       expand = c(0, 0)) +
+    labs(
+      # title = "Vegetation use either side of the shooting events",
+      title = op_i$op,
+      y = "Proportion of steps", 
+      fill = "") +
+    scale_fill_manual(values = veg_colours, drop = TRUE) +
+    coord_cartesian(ylim = c(0, 1)) +
+    facet_wrap(~ type, ncol = 1) +
+    theme_bw() +
+    theme(legend.position = "bottom") +
+    guides(fill = guide_legend(nrow = 3))
+
+  ggsave(file.path(outputs_veg_dir, paste0("veg_props_shooting_vs_pseudo_", op_i$file_suffix, ".png")),
+         plot = p, width = 150, height = 180, scale = 1, units = "mm", dpi = 600)
+
+  # one tab per shooting operation: heading first, then the plot
+  cat("\n\n#### ", op_i$op, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+::: {.panel-tabset}
+
+## All shooting operations
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+bin_width <- 0.5  # hours
+z <- qnorm(0.975) # 95% interval
+
+seqs_win <- shooting_sequences_daily_all %>%
+  mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
+
+veg_cols <- grep("^veg_", names(seqs_win), value = TRUE)
+
+dir.create("outputs", showWarnings = FALSE)
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- seqs_win %>%
+    group_by(type, bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 0) %>%
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, aes(x = bin, colour = type, fill = type, colour = type, group = type)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, 
+                linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 1) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) + 
+    scale_colour_manual(name = "", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "", values = shoot_cols, labels = shoot_labels) +
+    coord_cartesian(ylim = c(0, 1)) +
+    labs(subtitle = veg_label,
+         # subtitle = "All shooting operations"
+         ) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(file.path(outputs_veg_dir, paste0(veg_col, "_shooting_vs_pseudo_all.png")),
+         plot = p, width = 150, height = 80, units = "mm", scale = 1, dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("\n\n#### ", veg_label, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+## First shoot (early Nov 2025)
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+# first shooting operation
+shooting_window_min <- lubridate::as_date("2025 11 01")
+shooting_window_max <- lubridate::as_date("2025 11 10")
+
+bin_width <- 0.5  # hours
+z <- qnorm(0.975) # 95% interval
+
+seqs_win <- shooting_sequences_daily_all %>%
+  filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
+  mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
+
+veg_cols <- grep("^veg_", names(seqs_win), value = TRUE)
+
+dir.create("outputs", showWarnings = FALSE)
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- seqs_win %>%
+    group_by(type, bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 0) %>%
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, aes(x = bin, colour = type, fill = type, group = type)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 1) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    coord_cartesian(ylim = c(0, 1)) +
+    labs(title = veg_label,
+         subtitle = "First shooting: 2025-11-05 to 2025-11-07",
+         colour = "Shoot", fill = "Shoot") +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(file.path(outputs_veg_dir, paste0(veg_col, "_shooting_vs_pseudo_first.png")),
+         plot = p, width = 150, height = 100, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("\n\n#### ", veg_label, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+## Second shoot (late Nov/early Dec 2025)
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+# second shooting operation
+shooting_window_min <- lubridate::as_date("2025 11 25")
+shooting_window_max <- lubridate::as_date("2025 12 14")
+
+bin_width <- 0.5  # hours
+z <- qnorm(0.975) # 95% interval
+
+seqs_win <- shooting_sequences_daily_all %>%
+  filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
+  mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
+
+veg_cols <- grep("^veg_", names(seqs_win), value = TRUE)
+
+dir.create("outputs", showWarnings = FALSE)
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- seqs_win %>%
+    group_by(type, bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 0) %>%
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, aes(x = bin, colour = type, fill = type, group = type)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 1) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    coord_cartesian(ylim = c(0, 1)) +
+    labs(title = veg_label,
+         subtitle = "Second shooting operations: 2025-11-30 to 2025-12-01",
+         colour = "Shoot", fill = "Shoot") +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(file.path(outputs_veg_dir, paste0(veg_col, "_shooting_vs_pseudo_second.png")),
+         plot = p, width = 150, height = 100, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("\n\n#### ", veg_label, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+## Third shoot (May 2026)
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+# third shooting operation
+shooting_window_min <- lubridate::as_date("2026 05 12")
+shooting_window_max <- lubridate::as_date("2026 05 30")
+
+bin_width <- 0.5  # hours
+z <- qnorm(0.975) # 95% interval
+
+seqs_win <- shooting_sequences_daily_all %>%
+  filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
+  mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
+
+veg_cols <- grep("^veg_", names(seqs_win), value = TRUE)
+
+dir.create("outputs", showWarnings = FALSE)
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- seqs_win %>%
+    group_by(type, bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 0) %>%
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, aes(x = bin, colour = type, fill = type, group = type)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 1) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    coord_cartesian(ylim = c(0, 1)) +
+    labs(title = veg_label,
+         subtitle = "Third shooting: May 2026",
+         colour = "Shoot", fill = "Shoot") +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(file.path(outputs_veg_dir, paste0(veg_col, "_shooting_vs_pseudo_third.png")),
+         plot = p, width = 150, height = 100, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("\n\n#### ", veg_label, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+## Fourth shoot (Aug 2026)
+
+```{r}
+#| results: asis
+#| fig-width: 6
+#| fig-height: 4
+
+# third shooting operation
+shooting_window_min <- lubridate::as_date("2026 08 12")
+shooting_window_max <- lubridate::as_date("2026 08 30")
+
+bin_width <- 0.5  # hours
+z <- qnorm(0.975) # 95% interval
+
+seqs_win <- shooting_sequences_daily_all %>%
+  filter(shoot_time > shooting_window_min & shoot_time < shooting_window_max) %>%
+  mutate(bin = floor(time_diff_hrs / bin_width) * bin_width + bin_width / 2)
+
+veg_cols <- grep("^veg_", names(seqs_win), value = TRUE)
+
+dir.create("outputs", showWarnings = FALSE)
+
+cat("::: {.panel-tabset}\n\n")
+
+for (veg_col in veg_cols) {
+
+  veg_label <- gsub("_", " ", sub("^veg_", "", veg_col)) %>%
+    stringr::str_to_sentence()
+
+  bin_summary <- seqs_win %>%
+    group_by(type, bin) %>%
+    summarise(
+      n = sum(!is.na(.data[[veg_col]])),
+      k = sum(.data[[veg_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n > 0) %>%
+    mutate(
+      p      = k / n,
+      centre = (p + z^2 / (2 * n)) / (1 + z^2 / n),
+      half   = z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n),
+      lower  = pmax(0, centre - half),
+      upper  = pmin(1, centre + half)
+    )
+
+  p <- ggplot(bin_summary, aes(x = bin, colour = type, fill = type, group = type)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = 0.25, colour = alpha("black", 0.75), linewidth = 0.15) +
+    geom_line(aes(y = p)) +
+    geom_point(aes(y = p), size = 1) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+    scale_y_continuous("Proportion of fixes",
+                       limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
+    scale_x_continuous("GPS time relative to shooting event (hours)",
+                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+    scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
+    coord_cartesian(ylim = c(0, 1)) +
+    labs(title = veg_label,
+         subtitle = "Fourth shooting: August 2026",
+         colour = "Shoot", fill = "Shoot") +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(file.path(outputs_veg_dir, paste0(veg_col, "_shooting_vs_pseudo_fourth.png")),
+         plot = p, width = 150, height = 100, units = "mm", dpi = 600)
+
+  # one tab per habitat: heading first, then the plot
+  cat("\n\n#### ", veg_label, "\n\n")
+  print(p)
+}
+
+cat("\n\n:::\n")
+
+```
+
+:::
+
+# Paired comparisons: observed shoots vs 5 days before
+
+The 5-days-before control uses the same pig at the same time of day (and likely in a similar area), so each observed sequence can be paired with its own control sequence (matched by `seq_id`, i.e. pig × shoot). For each pair we:
+
+1. summarise each metric within fixed time windows relative to the shoot (one value per sequence per window),
+2. subtract the 5-days-before value from the observed value (observed − control), and
+3. test whether those paired differences are centred on 0 using a Wilcoxon signed-rank test.
+
+Pairing cancels out the diel cycle and differences between individual pigs, and summarising to one value per pair and window avoids treating the autocorrelated 30-minute fixes as independent. The histograms show exactly what each test is assessing: the distribution of paired differences, with the dashed line at 0 (no difference) and the solid line at the median difference. A shift of the histogram away from 0 is what the test detects.
+
+A few caveats: there are only a small number of pairs, and some pigs contribute more than one pair, so the pairs are not fully independent (a mixed model with a random intercept for pig would account for this). We report p-values adjusted for multiple testing (Benjamini–Hochberg, within each metric) alongside the raw values.
+
+## Set up the paired data
+
+```{r}
+
+# time windows (hours relative to the shoot) for the paired comparisons
+# windows include their start and exclude their end, so the fix at t = 0 is in the first window after the shoot
+# paired_breaks <- c(-3, 0, 3, 6, 12, 24)
+# paired_labels <- c("3-0 h before", "0-3 h after", "3-6 h after", "6-12 h after", "12-24 h after")
+
+# paired_breaks <- c(-3, -1.5, 0, 1.5, 3, 6)
+# paired_labels <- c("3-1.5 h before", "1.5-0 h before", "0-1.5 h after", "1.5-3 h after", "3-6 h after")
+
+paired_breaks <- c(-3, -1, 0, 1, 3, 6)
+paired_labels <- c("3-1 h before", "1-0 h before", "0-1 h after", "1-3 h after", "3-6 h after")
+
+paired_data <- shooting_sequences_daily_all %>%
+  st_drop_geometry() %>%
+  filter(type %in% c("Observed", "Pseudo")) %>%
+  mutate(window = cut(time_diff_hrs, breaks = paired_breaks, labels = paired_labels, right = FALSE)) %>%
+  filter(!is.na(window))
+
+# number of sequences that have both an observed and a control sequence
+paired_data %>%
+  distinct(type, seq_id) %>%
+  count(type)
+
+# Wilcoxon signed-rank test of whether the paired differences are centred on 0,
+# with Benjamini-Hochberg adjusted p-values across all the tests in the table
+paired_wilcox <- function(diffs, ...) {
+  diffs %>%
+    group_by(...) %>%
+    summarise(
+      n           = sum(!is.na(diff)),
+      median_diff = median(diff, na.rm = TRUE),
+      mean_diff   = mean(diff, na.rm = TRUE),
+      # returns NA when all differences are 0 (e.g. a vegetation class that was never used)
+      p_value     = if (all(diff == 0, na.rm = TRUE)) NA_real_ else
+                      suppressWarnings(wilcox.test(diff, mu = 0, exact = FALSE)$p.value),
+      .groups = "drop"
+    ) %>%
+    mutate(p_adj = p.adjust(p_value, method = "BH"))
+}
+
+# histogram of the paired differences, with 0 (dashed) and the median difference (solid)
+plot_paired_diffs <- function(diffs, tests, x_lab, title, digits = 2) {
+
+  tests <- tests %>%
+    mutate(label = paste0("n = ", n,
+                          "\nmean = ", round(mean_diff, digits),
+                          "\np = ", signif(p_value, 2),
+                          "\np adj = ", signif(p_adj, 2)))
+
+  diffs %>%
+    ggplot(aes(x = diff)) +
+    geom_histogram(bins = 15, fill = shoot_cols["Observed"], colour = "white", alpha = 0.7) +
+    geom_rug(colour = shoot_cols["Observed"], alpha = 0.7) +
+    geom_vline(xintercept = 0, linetype = "dashed") +
+    geom_vline(data = tests, aes(xintercept = mean_diff), colour = shoot_cols["Observed"], linewidth = 0.8) +
+    geom_text(data = tests, aes(x = Inf, y = Inf, label = label),
+              hjust = 1.05, vjust = 1.1, size = 2.5, lineheight = 0.9) +
+    scale_y_continuous("Number of pairs", expand = expansion(mult = c(0, 0.6))) +
+    labs(x = x_lab, title = title,
+         # subtitle = "Observed shoot minus the same pig 5 days before"
+         ) +
+    theme_bw()
+}
+
+```
+
+## Distance from the location at the time of shooting
+
+Mean distance (m) from the pig's location at t = 0 within each window. Positive differences mean the pig was further from where it was at t = 0 on the shoot day than at the same time 5 days before (i.e. fleeing), and differences near 0 mean no change relative to normal movement.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 3.5
+
+dist_t0_diffs <- paired_data %>%
+  group_by(type, seq_id, name, window) %>%
+  summarise(value = mean(dist_to_t0_m, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = type, values_from = value) %>%
+  mutate(diff = Observed - Pseudo) %>%
+  filter(!is.na(diff))
+
+dist_t0_tests <- paired_wilcox(dist_t0_diffs, window)
+dist_t0_tests
+
+plot_paired_diffs(dist_t0_diffs, dist_t0_tests,
+                  x_lab = "Difference in mean distance from location at time of shooting (m)",
+                  title = "Distance from the location at the time of shooting",
+                  digits = 0) +
+  facet_wrap(~ window, nrow = 1)
+
+ggsave(paste0(outputs_dir, "paired_diff_dist_to_t0.png"),
+       width = 250, height = 90, units = "mm", scale = 1, dpi = 600)
+
+write_csv(dist_t0_tests, paste0(outputs_dir, "paired_tests_dist_to_t0.csv"))
+
+```
+
+## Step lengths
+
+Mean log(step length + 1) within each window. Differences are on the log scale, so `exp(diff)` is the ratio of the (geometric mean) step lengths, e.g. a difference of 0.69 means steps were about twice as long on the shoot day as 5 days before.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 3.5
+
+sl_diffs <- paired_data %>%
+  group_by(type, seq_id, name, window) %>%
+  summarise(value = mean(log1p(sl_), na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = type, values_from = value) %>%
+  mutate(diff = Observed - Pseudo) %>%
+  filter(!is.na(diff))
+
+sl_tests <- paired_wilcox(sl_diffs, window) %>%
+  mutate(median_ratio = exp(median_diff))
+sl_tests
+
+plot_paired_diffs(sl_diffs, sl_tests,
+                  x_lab = "Difference in mean log(step length + 1)",
+                  title = "Step lengths") +
+  facet_wrap(~ window, nrow = 1)
+
+ggsave(paste0(outputs_dir, "paired_diff_step_length.png"),
+       width = 165, height = 55, units = "mm", scale = 1.25, dpi = 600)
+
+write_csv(sl_tests, paste0(outputs_dir, "paired_tests_step_length.csv"))
+
+```
+
+## Vegetation classes - all
+
+Proportion of fixes in each vegetation class within each window. Positive differences mean the pig used that class more on the shoot day than 5 days before. Classes that a pig never used in either sequence contribute a difference of 0, so classes that are rarely used will have most of their differences at exactly 0.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 14
+
+veg_diffs <- paired_data %>%
+  filter(!is.na(Veg_class)) %>%
+  count(type, seq_id, name, window, Veg_class) %>%
+  # fill classes that weren't used in a window with zeros, so the proportions are comparable
+  complete(nesting(seq_id, name), type, window, Veg_class, fill = list(n = 0)) %>%
+  group_by(type, seq_id, window) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup() %>%
+  filter(!is.nan(prop)) %>%  # windows with no fixes
+  select(-n) %>%
+  pivot_wider(names_from = type, values_from = prop) %>%
+  mutate(diff = Observed - Pseudo,
+         Veg_class = factor(Veg_class, levels = names(veg_colours))) %>%
+  filter(!is.na(diff))
+
+veg_tests <- paired_wilcox(veg_diffs, Veg_class, window)
+veg_tests %>% arrange(p_value)
+
+plot_paired_diffs(veg_diffs, veg_tests,
+                  x_lab = "Difference in the proportion of fixes in each vegetation class",
+                  title = "Vegetation classes") +
+  facet_grid(Veg_class ~ window, labeller = labeller(Veg_class = label_wrap_gen(12))) +
+  theme(strip.text.y = element_text(angle = 0))
+
+ggsave(paste0(outputs_dir, "paired_diff_veg_classes.png"),
+       width = 250, height = 350, units = "mm", scale = 1, dpi = 600)
+
+write_csv(veg_tests, paste0(outputs_dir, "paired_tests_veg_classes.csv"))
+
+```
+
+## Vegetation classes - subset
+
+Proportion of fixes in each vegetation class within each window. Positive differences mean the pig used that class more on the shoot day than 5 days before. Classes that a pig never used in either sequence contribute a difference of 0, so classes that are rarely used will have most of their differences at exactly 0.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 6
+
+paired_data_subset <- paired_data %>%
+  filter(Veg_class %in% c("Dry Rainforest", 
+                          "Floodplain Sedgeland", 
+                          "Melaleuca Closed Forest"))
+
+veg_diffs <- paired_data_subset %>%
+  filter(!is.na(Veg_class)) %>%
+  count(type, seq_id, name, window, Veg_class) %>%
+  # fill classes that weren't used in a window with zeros, so the proportions are comparable
+  complete(nesting(seq_id, name), type, window, Veg_class, fill = list(n = 0)) %>%
+  group_by(type, seq_id, window) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup() %>%
+  filter(!is.nan(prop)) %>%  # windows with no fixes
+  select(-n) %>%
+  pivot_wider(names_from = type, values_from = prop) %>%
+  mutate(diff = Observed - Pseudo,
+         Veg_class = factor(Veg_class, levels = names(veg_colours))) %>%
+  filter(!is.na(diff))
+
+veg_tests <- paired_wilcox(veg_diffs, Veg_class, window)
+veg_tests %>% arrange(p_value)
+
+plot_paired_diffs(veg_diffs, veg_tests,
+                  x_lab = "Difference in the proportion of fixes in each vegetation class",
+                  title = "Vegetation classes") +
+  facet_grid(Veg_class ~ window, labeller = labeller(Veg_class = label_wrap_gen(12))) +
+  theme(strip.text.y = element_text(angle = 0))
+
+ggsave(paste0(outputs_dir, "paired_diff_veg_classes_subset.png"),
+       width = 180, height = 110, units = "mm", scale = 1.25, dpi = 600)
+
+```
+
+# References
+
+::: {#refs}
+:::
+
+# Session Information
+
+```{r}
+
+utils::sessionInfo()
+
+```
+

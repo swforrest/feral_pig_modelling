@@ -20,12 +20,6 @@ format:
     code-overflow: scroll
     fig-format: png
     fig-dpi: 300
-  pdf:
-    fig-format: png
-    fig-dpi: 300
-    geometry: 
-      - top=30mm
-      - left=30mm
 editor:
   source
 abstract: |
@@ -1199,6 +1193,63 @@ for (i in seq_len(nrow(shoot_operations))) {
 cat("\n\n:::\n")
 
 ```
+
+## Step lengths relative to hour of day
+
+```{r}
+
+bin_width <- 0.5  # hours
+
+bin_means_both <- shooting_sequences_daily_all %>%
+    st_drop_geometry() %>%
+    mutate(bin = floor(hour / bin_width) * bin_width + bin_width / 2) %>%
+    group_by(type, bin) %>%
+    summarise(
+      mean_sl = mean(sl_, na.rm = TRUE),
+      se      = sd(sl_, na.rm = TRUE) / sqrt(sum(!is.na(sl_))),
+      q025    = quantile(sl_, probs = 0.025, na.rm = TRUE),
+      q975    = quantile(sl_, probs = 0.975, na.rm = TRUE),
+      q25     = quantile(sl_, probs = 0.25, na.rm = TRUE),
+      q50     = quantile(sl_, probs = 0.5, na.rm = TRUE),
+      q75     = quantile(sl_, probs = 0.75, na.rm = TRUE),
+      n       = sum(!is.na(sl_)),
+      .groups = "drop"
+    )
+
+bin_means_both %>%
+  ggplot(aes(x = bin)) +
+  
+  # 95% confidence interval as a ribbon
+  geom_ribbon(aes(ymin = q025, ymax = q975, fill = type, colour = type),
+              alpha = 0.15, 
+              # linetype = "dashed",
+              linewidth = 0.15) +
+  # 50% interquartile range as a ribbon
+  geom_ribbon(aes(ymin = q25, ymax = q75, fill = type, colour = type),
+              alpha = 0.25, 
+              linewidth = 0.25) +
+  
+  geom_line(aes(y = mean_sl, colour = type)) +
+  geom_point(aes(y = mean_sl, colour = type), size = 1) +
+  geom_vline(data = shooting_sequences_daily_all,
+             aes(xintercept = hour(hms(shoot_time))), linetype = "dashed", colour = "red") +
+  scale_y_continuous("Step length (m)") +
+  # scale_x_continuous("GPS time relative to shooting event (hours)",
+  #                    breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+  scale_colour_manual(name = "", values = shoot_cols, labels = shoot_labels) +
+  scale_fill_manual(name = "", values = shoot_cols, labels = shoot_labels) +
+  coord_cartesian(ylim = c(0, 500)) +
+  labs(subtitle = "Step lengths",
+       # subtitle = op_i$op
+       ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+ggsave(paste0(outputs_dir, "step_length_hour_shooting_vs_pseudo.png"),
+       plot = p, width = 150, height = 90, units = "mm", scale = 1, dpi = 600)
+
+```
+
 
 # Vegetation responses
 
