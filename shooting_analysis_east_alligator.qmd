@@ -23,9 +23,9 @@ format:
 editor:
   source
 abstract: |
-  Here we are looking at how feral pigs respond to aerial shooting operations in the East Alligator region of Kakadu National Park, Northern Territory, Australia. We have GPS tracking data from pigs in the area, and we are looking at how their movement patterns change before and after shooting events. Because the pig's behaviour is temporally variable, we also need to ensure that the timing of the shooting operations isn't correlated with ordinary behavioural changes (which it seems to be). Therefore, as a control, we also run the same analyses on data at the same time of day, but 3 days before shooting occurred, and as an additional control, for pigs that were outside the area shooting was occurring.
+  Here we are looking at how feral pigs respond to aerial shooting operations in the East Alligator region of Kakadu National Park, Northern Territory, Australia. We have GPS tracking data from pigs in the area, and we are looking at how their movement patterns change before and after shooting events. Because the pig's behaviour is temporally variable, we also need to ensure that the timing of the shooting operations isn't correlated with ordinary behavioural changes (which it seems to be). Therefore, as a control, we also run the same analyses on data for the same pigs at the same time of day, but 5 days before shooting occurred.
   
-  We look at changes in their movement behaviour, measured as the distance between successive GPS fixes (step length), as well as their habitat use, measured as the proportion of time they spend in different vegetation classes.
+  We look at changes in their movement behaviour, measured as the distance from their GPS location that was closest in time to each shoot (to look for fleeing or bunkering down behaviour), and between successive GPS fixes (step length), as well as their habitat use, measured as the proportion of time they spend in different vegetation classes.
 ---
 
 # Load packages
@@ -711,14 +711,15 @@ ggplot(hits_nearest_time, aes(x = shoot_time)) +
 
 ```{r}
 
-shoot_focal_window <- 24 # time either side of focal shooting location (in hours)
+shoot_focal_window_before <- 12 # time either side of focal shooting location (in hours)
+shoot_focal_window_after <- 48 # time either side of focal shooting location (in hours)
 
 # one row per pig/shooting instance, with the temporal window to filter the data by
 focal <- hits_nearest_time %>%
   st_drop_geometry() %>%
   distinct(name, shoot_id, shoot_time) %>%
-  mutate(win_start = shoot_time - hours(shoot_focal_window),
-         win_end   = shoot_time + hours(shoot_focal_window))
+  mutate(win_start = shoot_time - hours(shoot_focal_window_before),
+         win_end   = shoot_time + hours(shoot_focal_window_after))
 
 head(focal, 10)
 
@@ -874,7 +875,7 @@ shooting_sequences_daily %>% #filter(name == "Dora the Explorer") %>%
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
   scale_y_continuous("Step length (m)") +
   scale_x_continuous("GPS time relative to shooting event (hours)", 
-                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+                     breaks = seq(-shoot_focal_window_before, shoot_focal_window_after, by = 3)) +
   coord_cartesian(ylim = c(0, 750)) +
   scale_colour_viridis_d() +
   labs(title = "Observed shooting events") +
@@ -905,8 +906,8 @@ focal_pseudo <- hits_nearest_time %>%
   distinct(name, shoot_id, shoot_time) %>%
   mutate(
     shoot_time = shoot_time - pseudo_interval,
-    win_start = shoot_time - hours(shoot_focal_window),
-    win_end   = shoot_time + hours(shoot_focal_window)
+    win_start = shoot_time - hours(shoot_focal_window_before),
+    win_end   = shoot_time + hours(shoot_focal_window_after)
     )
 
 # Shooting locations, same CRS as the pigs, one row per shoot_id
@@ -1017,7 +1018,7 @@ shooting_sequences_daily_pseudo %>% #filter(name == "Dora the Explorer") %>%
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
   scale_y_continuous("Step length (m)") +
   scale_x_continuous("GPS time relative to shooting event (hours)", 
-                     breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+                     breaks = seq(-shoot_focal_window_before, shoot_focal_window_after, by = 3)) +
   coord_cartesian(ylim = c(0, 750)) +
   scale_colour_viridis_d() +
   labs(title = "5 days before the shooting events") +
@@ -1104,7 +1105,7 @@ for (i in seq_len(nrow(shoot_operations))) {
     geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
     scale_y_continuous("Distance (m)") +
     scale_x_continuous("GPS time relative to shooting event (hours)",
-                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+                       breaks = seq(-shoot_focal_window_before, shoot_focal_window_after, by = 3)) +
     scale_colour_manual(name = "", values = shoot_cols, labels = shoot_labels) +
     scale_fill_manual(name = "", values = shoot_cols, labels = shoot_labels) +
     # coord_cartesian(ylim = c(0, 3500)) +
@@ -1172,7 +1173,7 @@ for (i in seq_len(nrow(shoot_operations))) {
     geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
     scale_y_continuous("Step length (m)") +
     scale_x_continuous("GPS time relative to shooting event (hours)",
-                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+                       breaks = seq(-shoot_focal_window_before, shoot_focal_window_after, by = 3)) +
     scale_colour_manual(name = "", values = shoot_cols, labels = shoot_labels) +
     scale_fill_manual(name = "", values = shoot_cols, labels = shoot_labels) +
     coord_cartesian(ylim = c(0, 500)) +
@@ -1197,6 +1198,11 @@ cat("\n\n:::\n")
 ## Step lengths relative to hour of day
 
 ```{r}
+
+shooting_sequences_daily_all <- shooting_sequences_daily_all %>% 
+  mutate(
+    shoot_hour = hour(shoot_time) + minute(shoot_time) / 60 + second(shoot_time) / 3600
+  )
 
 bin_width <- 0.5  # hours
 
@@ -1232,10 +1238,10 @@ bin_means_both %>%
   geom_line(aes(y = mean_sl, colour = type)) +
   geom_point(aes(y = mean_sl, colour = type), size = 1) +
   geom_vline(data = shooting_sequences_daily_all,
-             aes(xintercept = hour(hms(shoot_time))), linetype = "dashed", colour = "red") +
+             aes(xintercept = shoot_hour), linetype = "dashed", colour = "red") +
   scale_y_continuous("Step length (m)") +
-  # scale_x_continuous("GPS time relative to shooting event (hours)",
-  #                    breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+  scale_x_continuous("Hour of the day",
+                     breaks = seq(-shoot_focal_window_before, shoot_focal_window_after, by = 3)) +
   scale_colour_manual(name = "", values = shoot_cols, labels = shoot_labels) +
   scale_fill_manual(name = "", values = shoot_cols, labels = shoot_labels) +
   coord_cartesian(ylim = c(0, 500)) +
@@ -1249,7 +1255,6 @@ ggsave(paste0(outputs_dir, "step_length_hour_shooting_vs_pseudo.png"),
        plot = p, width = 150, height = 90, units = "mm", scale = 1, dpi = 600)
 
 ```
-
 
 # Vegetation responses
 
@@ -1314,7 +1319,7 @@ for (i in seq_len(nrow(shoot_operations))) {
 
     scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
     scale_x_continuous("GPS time relative to shooting event (hours)",
-                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3),
+                       breaks = seq(-shoot_focal_window_before, shoot_focal_window_after, by = 3),
                        expand = c(0, 0)) +
     labs(
       # title = "Vegetation use either side of the shooting events",
@@ -1392,7 +1397,7 @@ for (veg_col in veg_cols) {
     scale_y_continuous("Proportion of fixes",
                        limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
     scale_x_continuous("GPS time relative to shooting event (hours)",
-                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) + 
+                       breaks = seq(-shoot_focal_window_before, shoot_focal_window_after, by = 3)) + 
     scale_colour_manual(name = "", values = shoot_cols, labels = shoot_labels) +
     scale_fill_manual(name = "", values = shoot_cols, labels = shoot_labels) +
     coord_cartesian(ylim = c(0, 1)) +
@@ -1468,7 +1473,7 @@ for (veg_col in veg_cols) {
     scale_y_continuous("Proportion of fixes",
                        limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
     scale_x_continuous("GPS time relative to shooting event (hours)",
-                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+                       breaks = seq(-shoot_focal_window_before, shoot_focal_window_after, by = 3)) +
     scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     coord_cartesian(ylim = c(0, 1)) +
@@ -1544,7 +1549,7 @@ for (veg_col in veg_cols) {
     scale_y_continuous("Proportion of fixes",
                        limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
     scale_x_continuous("GPS time relative to shooting event (hours)",
-                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+                       breaks = seq(-shoot_focal_window_before, shoot_focal_window_after, by = 3)) + 
     scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     coord_cartesian(ylim = c(0, 1)) +
@@ -1620,7 +1625,7 @@ for (veg_col in veg_cols) {
     scale_y_continuous("Proportion of fixes",
                        limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
     scale_x_continuous("GPS time relative to shooting event (hours)",
-                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+                       breaks = seq(-shoot_focal_window_before, shoot_focal_window_after, by = 3)) +
     scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     coord_cartesian(ylim = c(0, 1)) +
@@ -1696,7 +1701,7 @@ for (veg_col in veg_cols) {
     scale_y_continuous("Proportion of fixes",
                        limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
     scale_x_continuous("GPS time relative to shooting event (hours)",
-                       breaks = seq(-shoot_focal_window, shoot_focal_window, by = 3)) +
+                       breaks = seq(-shoot_focal_window_before, shoot_focal_window_after, by = 3)) +
     scale_colour_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     scale_fill_manual(name = "Shoot vs\ncontrol", values = shoot_cols, labels = shoot_labels) +
     coord_cartesian(ylim = c(0, 1)) +
